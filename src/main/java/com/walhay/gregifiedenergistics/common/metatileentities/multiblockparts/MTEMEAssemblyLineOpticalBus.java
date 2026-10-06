@@ -129,19 +129,24 @@ public class MTEMEAssemblyLineOpticalBus extends MTEAbstractAssemblyLineBus impl
 	}
 
 	private void updatePatternData() {
-		if (!isAttachedToMultiBlock()) return;
+		if (!isAttachedToMultiBlock()) {
+			clearPatternData();
+			return;
+		}
 
 		TileEntity te = getWorld().getTileEntity(getPos().offset(opticalFacing));
 		if (te instanceof TileEntityOpticalPipe) {
 			INetRecipeHandler data = te.getCapability(
 					GregifiedEnergisticsCapabilities.CAPABILITY_RECIPE_HANDLER, opticalFacing.getOpposite());
 
-			if (data == null) return;
+			if (data == null) {
+				clearPatternData();
+				return;
+			}
 
 			var recipes = data.getRecipes();
 			if (recipes == null || recipes.isEmpty()) {
-				patterns.clear();
-				notifyPatternChange();
+				clearPatternData();
 				return;
 			}
 
@@ -152,7 +157,17 @@ public class MTEMEAssemblyLineOpticalBus extends MTEAbstractAssemblyLineBus impl
 			});
 
 			notifyPatternChange();
+			return;
 		}
+
+		clearPatternData();
+	}
+
+	private void clearPatternData() {
+		if (patterns.isEmpty()) return;
+
+		patterns.clear();
+		notifyPatternChange();
 	}
 
 	@Override
