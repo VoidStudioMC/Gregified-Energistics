@@ -145,6 +145,7 @@ public class MTEMEAssemblyLineOpticalBus extends MTEAbstractAssemblyLineBus impl
 				return;
 			}
 
+			patterns.clear();
 			recipes.stream().map(RecipePatternHelper::new).forEach(pattern -> {
 				pattern.injectSubstitutions(substitutionStorage);
 				patterns.add(pattern);
