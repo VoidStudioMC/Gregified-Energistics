@@ -32,6 +32,7 @@ jobs:
       run: ./gradlew spotlessCheck
   
   build:
+    needs: linter
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -64,6 +65,7 @@ jobs:
     #   run: gradle build
 
   units:
+    needs: [linter, build]
     runs-on: ubuntu-latest
     permissions:
       contents: read
