@@ -46,13 +46,6 @@ public abstract class OpticalPipeNetMixin extends PipeNet<OpticalPipeProperties>
 		notifyRecipeHandlers();
 	}
 
-	@Override
-	public void onNeighbourUpdate(BlockPos pos) {
-		notifyRecipeHandlers();
-		super.onNeighbourUpdate(pos);
-		notifyRecipeHandlers();
-	}
-
 	private void notifyRecipeHandlers() {
 		Collection<INetRecipeHandler> seen = new ArrayList<>();
 		getAllNodes().keySet().forEach(pos -> {
