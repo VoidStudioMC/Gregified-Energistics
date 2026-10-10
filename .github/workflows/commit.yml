@@ -17,10 +17,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Set up JDK 25
+    - name: Set up JDK 25 (runs Gradle)
       uses: actions/setup-java@v5
       with:
         java-version: '25'
+        distribution: 'zulu'
+
+    - name: Set up JDK 16 (project toolchain)
+      uses: actions/setup-java@v5
+      with:
+        java-version: '16'
         distribution: 'zulu'
 
     # Configure Gradle for optimal use in GitHub Actions, including caching of downloaded dependencies.
@@ -39,10 +45,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Set up JDK 25
+    - name: Set up JDK 25 (runs Gradle)
       uses: actions/setup-java@v5
       with:
         java-version: '25'
+        distribution: 'zulu'
+
+    - name: Set up JDK 16 (project toolchain)
+      uses: actions/setup-java@v5
+      with:
+        java-version: '16'
         distribution: 'zulu'
 
     # Configure Gradle for optimal use in GitHub Actions, including caching of downloaded dependencies.
@@ -72,10 +84,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Set up JDK 25
+    - name: Set up JDK 25 (runs Gradle)
       uses: actions/setup-java@v5
       with:
         java-version: '25'
+        distribution: 'zulu'
+
+    - name: Set up JDK 16 (project toolchain)
+      uses: actions/setup-java@v5
+      with:
+        java-version: '16'
         distribution: 'zulu'
         
     - name: Setup Gradle
