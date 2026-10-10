@@ -20,6 +20,7 @@ import codechicken.lib.render.pipeline.IVertexOperation;
 import codechicken.lib.vec.Matrix4;
 import com.cleanroommc.modularui.api.IPanelHandler;
 import com.cleanroommc.modularui.api.drawable.IKey;
+import com.cleanroommc.modularui.drawable.Icon;
 import com.cleanroommc.modularui.factory.PosGuiData;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.RichTooltip;
@@ -29,6 +30,7 @@ import com.cleanroommc.modularui.value.sync.*;
 import com.cleanroommc.modularui.widget.Widget;
 import com.cleanroommc.modularui.widgets.DynamicSyncedWidget;
 import com.cleanroommc.modularui.widgets.SlotGroupWidget;
+import com.cleanroommc.modularui.widgets.ToggleButton;
 import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.layout.Grid;
 import com.cleanroommc.modularui.widgets.slot.FluidSlot;
@@ -91,7 +93,7 @@ import org.lwjgl.input.Keyboard;
 /** MTEMEPatternBuffer */
 public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemStack>
 		implements IMultiblockAbilityPart<IItemHandlerModifiable> {
-	private boolean isWorkingEnabled = true;
+	private boolean workingEnabled = true;
 
 	private final PatternHandler patternHandler;
 
@@ -150,13 +152,13 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 
 	@Override
 	public boolean isWorkingEnabled() {
-		return isWorkingEnabled;
+		return workingEnabled;
 	}
 
 	@Override
-	public void setWorkingEnabled(boolean isWorkingEnabled) {
-		if (this.isWorkingEnabled != isWorkingEnabled) {
-			this.isWorkingEnabled = isWorkingEnabled;
+	public void setWorkingEnabled(boolean workingEnabled) {
+		if (this.workingEnabled != workingEnabled) {
+			this.workingEnabled = workingEnabled;
 			notifyPatternChange();
 		}
 	}
@@ -214,10 +216,13 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 	public ModularPanel buildUI(PosGuiData guiData, PanelSyncManager syncManager, UISettings settings) {
 		syncManager.registerSlotGroup("pattern_inv", 9);
 
-		return GTGuis.createPanel(this, 176, 184)
-				.child(IKey.lang("gregifiedenergistics.gui.patterns_grid")
-						.asWidget()
-						.pos(5, 5))
+		Icon detail = GTGuiTextures.BUTTON_POWER_DETAIL.asIcon().size(18, 6).marginTop(24);
+
+		BooleanSyncValue workingStateValue = new BooleanSyncValue(() -> workingEnabled, val -> workingEnabled = val);
+
+		return GTGuis.createPanel(this, 199, 184)
+				.child(IKey.lang(getMetaFullName()).asWidget().pos(5, 5))
+				.child(SlotGroupWidget.playerInventory(false).left(7).bottom(7))
 				.child(SlotGroupWidget.builder()
 						.slotGroup("pattern_inv")
 						.matrix("IIIIIIIII", "IIIIIIIII", "IIIIIIIII", "IIIIIIIII")
@@ -269,7 +274,24 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 						.disableSortButtons()
 						.horizontalCenter()
 						.top(20))
-				.bindPlayerInventory();
+				.child(Flow.column()
+						.pos(174, 100)
+						.width(18)
+						.height(18 * 4 + 5)
+						.child(new ToggleButton()
+								.name("power_button")
+								.size(18)
+								.disableHoverBackground()
+								.overlay(true, detail, GTGuiTextures.BUTTON_POWER[1])
+								.overlay(false, detail, GTGuiTextures.BUTTON_POWER[0])
+								.value(workingStateValue)
+								.tooltipAutoUpdate(true)
+								.tooltipBuilder(t -> t.addLine(IKey.lang(
+										workingStateValue.getBoolValue()
+												? "gregifiedenergistics.gui.working.enabled"
+												: "gregifiedenergistics.gui.working.disabled")))
+								.marginTop(4)
+								.top(18 * 3 + 5)));
 	}
 
 	@Override

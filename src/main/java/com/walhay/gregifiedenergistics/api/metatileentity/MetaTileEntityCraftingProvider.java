@@ -25,8 +25,8 @@ public abstract class MetaTileEntityCraftingProvider<T extends IAEStack<T>> exte
 	@Override
 	public void update() {
 		super.update();
-		if(getWorld().isRemote) return;
-		
+		if (getWorld().isRemote) return;
+
 		if (isWorkingEnabled() && shouldSyncME()) {
 			updateMEStatus();
 		}
