@@ -278,7 +278,7 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 	}
 
 	private SimpleOverlayRenderer getOverlay() {
-		return isActive()
+		return isOnline
 				? GregifiedEnergisticsTextures.ME_PATTERN_BUFFER_ACTIVE
 				: GregifiedEnergisticsTextures.ME_PATTERN_BUFFER;
 	}
@@ -502,7 +502,6 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 		}
 
 		public void setPattern(ICraftingPatternDetails pattern) {
-
 			int fluids = 0;
 			int items = 0;
 			int circuitValue = -1;
@@ -539,9 +538,6 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 				this.dsh.notifyUpdate(
 						buf -> buf.writeInt(itemInventory.getSlots()).writeInt(fluidInventory.getTanks()));
 			}
-
-			// Before the panel opens, its first server tick sends the current dimensions. Once open, pattern changes
-			// update the dynamic widget immediately.
 		}
 
 		public IItemHandlerModifiable inventory() {

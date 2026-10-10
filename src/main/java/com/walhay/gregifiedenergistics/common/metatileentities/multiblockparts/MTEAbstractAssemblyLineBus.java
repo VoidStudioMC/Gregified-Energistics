@@ -113,7 +113,7 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 		super.update();
 		if (getWorld().isRemote) return;
 
-		if (isWorkingEnabled() && shouldSyncME() && updateMEStatus()) {
+		if (isWorkingEnabled() && getOffsetTimer() % 5 == 0) {
 			if (hasItemsToSend()) pushItemsOut();
 
 			if (hasFluidsToSend()) pushFluidsOut();

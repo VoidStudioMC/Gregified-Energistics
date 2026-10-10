@@ -98,14 +98,13 @@ public class MTEMEPatternProvider extends MetaTileEntityCraftingProvider<IAEItem
 	@Override
 	public void update() {
 		super.update();
-		if (getWorld().isRemote || getOffsetTimer() % 5 != 0) {
-			return;
-		}
+		if (getWorld().isRemote) return;
 
-		if (isAutoCollapse()) {
-			if (!isAttachedToMultiBlock() || this.getNotifiedItemInputList().contains(importItems)) {
-				collapseInventorySlotContents(importItems);
-			}
+		if (isWorkingEnabled() && getOffsetTimer() % 5 == 0) {
+			if (!isAutoCollapse()) return;
+
+			if (isAttachedToMultiBlock() && !this.getNotifiedItemInputList().contains(importItems)) return;
+			collapseInventorySlotContents(importItems);
 		}
 	}
 
@@ -115,7 +114,7 @@ public class MTEMEPatternProvider extends MetaTileEntityCraftingProvider<IAEItem
 	}
 
 	private SimpleOverlayRenderer getOverlay() {
-		return isActive()
+		return isOnline
 				? GregifiedEnergisticsTextures.ME_PATTERN_PROVIDER_ACTIVE
 				: GregifiedEnergisticsTextures.ME_PATTERN_PROVIDER;
 	}
@@ -262,6 +261,7 @@ public class MTEMEPatternProvider extends MetaTileEntityCraftingProvider<IAEItem
 			this.autoCollapse = buf.readBoolean();
 		} else if (dataId == GregtechDataCodes.WORKING_ENABLED) {
 			this.workingEnabled = buf.readBoolean();
+			scheduleRenderUpdate();
 		}
 	}
 

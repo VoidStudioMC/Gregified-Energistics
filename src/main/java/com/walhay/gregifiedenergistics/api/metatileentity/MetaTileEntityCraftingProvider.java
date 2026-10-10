@@ -23,6 +23,16 @@ public abstract class MetaTileEntityCraftingProvider<T extends IAEStack<T>> exte
 	}
 
 	@Override
+	public void update() {
+		super.update();
+		if(getWorld().isRemote) return;
+		
+		if (isWorkingEnabled() && shouldSyncME()) {
+			updateMEStatus();
+		}
+	}
+
+	@Override
 	public boolean isBusy() {
 		return true;
 	}
@@ -40,7 +50,7 @@ public abstract class MetaTileEntityCraftingProvider<T extends IAEStack<T>> exte
 	}
 
 	// notify grid network when patterns should be recalculated
-	public void notifyPatternChange() {
+	protected void notifyPatternChange() {
 		if (Platform.isServer() && getProxy() != null) {
 			try {
 				getProxy()
