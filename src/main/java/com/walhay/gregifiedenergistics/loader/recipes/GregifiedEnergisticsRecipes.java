@@ -15,6 +15,7 @@ import static gregtech.common.metatileentities.MetaTileEntities.DATA_ACCESS_HATC
 import appeng.api.AEApi;
 import gregtech.api.unification.material.MarkerMaterials.Tier;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 
 public class GregifiedEnergisticsRecipes {
 
@@ -36,9 +37,8 @@ public class GregifiedEnergisticsRecipes {
 				.output(ME_ASSEMBLY_LINE_BUS)
 				.EUt(VA[LuV])
 				.duration(1200)
-				.scannerResearch(r -> r.researchStack(iface.getDefaultInstance())
-						.duration(3600)
-						.EUt(VA[LuV]))
+				.scannerResearch(r ->
+						r.researchStack(new ItemStack(iface)).duration(3600).EUt(VA[LuV]))
 				.buildAndRegister();
 
 		ASSEMBLY_LINE_RECIPES
