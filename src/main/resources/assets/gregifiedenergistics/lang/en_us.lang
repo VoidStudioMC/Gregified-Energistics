@@ -1,7 +1,7 @@
 gregifiedenergistics.machine.me_assembly_line_bus.name=ME Assembly Line Bus
 gregifiedenergistics.machine.me_assembly_line_bus.tooltip=Replaces the first Assembly Line input bus and imports recipes from your ME network.
 gregifiedenergistics.machine.me_assembly_line_bus.datastick=Accepts encoded Data Sticks and AE2 crafting patterns as recipe sources.
-gregifiedenergistics.machine.me_assembly_line_bus.pattern_slots=Each pattern slot maps to the matching Assembly Line input bus slot.
+gregifiedenergistics.machine.me_assembly_line_bus.pattern_slots=Each slot stores a recipe source. Recipe ingredients are sent to the input buses in order.
 gregifiedenergistics.machine.me_assembly_line_bus.fluid_mode=Fluid inputs are supported when recipes come from encoded Data Sticks.
 
 gregifiedenergistics.machine.me_assembly_line_optical_bus.name=ME Assembly Line Optical Bus
@@ -9,7 +9,7 @@ gregifiedenergistics.machine.me_assembly_line_optical_bus.tooltip=Replaces the f
 gregifiedenergistics.machine.me_assembly_line_optical_bus.optical_pipe=Connect the optical side to a Data Bank with an optical pipe to import Assembly Line recipes.
 
 gregifiedenergistics.machine.me_pattern_buffer.name=ME Pattern Buffer
-gregifiedenergistics.machine.me_pattern_buffer.tooltip=Stores up to 36 encoded patterns and their inputs for an Assembly Line multiblock.
+gregifiedenergistics.machine.me_pattern_buffer.tooltip=Stores up to 36 processing patterns and their inputs for compatible GregTech recipe multiblocks.
 gregifiedenergistics.machine.me_pattern_provider.tooltip=Provides one encoded pattern to the ME network and exports its inputs to the multiblock.
 gregifiedenergistics.machine.me_pattern_provider_iv.name=ME Pattern Provider (IV)
 gregifiedenergistics.machine.me_pattern_provider_luv.name=ME Pattern Provider (LuV)

@@ -14,8 +14,9 @@ public class GregifiedEnergisticsConfig {
 	public static class MachineConfig {
 
 		@Config.Name("Pattern Handler Size")
-		@Config.Comment({"Slots amoun in ME Assembly Line Bus", "Default: 36"})
-		@Config.RangeInt(min = 1)
+		@Config.Comment({"Pattern slots in the ME Assembly Line Bus", "Default: 36"})
+		@Config.RangeInt(min = 1, max = 4096)
+		@Config.RequiresMcRestart
 		public int patternHandlerSize = 36;
 	}
 
@@ -27,7 +28,7 @@ public class GregifiedEnergisticsConfig {
 		public int substitutionSlotsPerLine = 8;
 
 		@Config.Name(value = "Slots per line in pattern grid")
-		@Config.Comment({"0 = detect automatically", "Default: 9"})
+		@Config.Comment({"0 = automatic, up to 9 columns", "Default: 9"})
 		@Config.RangeInt(min = 0, max = 16)
 		public int patternSlotsPerLine = 9;
 	}
