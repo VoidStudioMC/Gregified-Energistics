@@ -63,7 +63,10 @@ public class DynamicItemSlot extends ModularSlot {
 	@Override
 	public ItemStack decrStackSize(int amount) {
 		if (!isValidHandler() || amount <= 0) return ItemStack.EMPTY;
-		return getItemHandler().extractItem(handlerIndex, Math.min(amount, displayLimit(getStack())), false);
+		ItemStack extracted =
+				getItemHandler().extractItem(handlerIndex, Math.min(amount, displayLimit(getStack())), false);
+		if (!extracted.isEmpty()) syncDisplay();
+		return extracted;
 	}
 
 	@Override
@@ -89,6 +92,16 @@ public class DynamicItemSlot extends ModularSlot {
 		if (ItemStack.areItemStacksEqual(actual, displayed)) return;
 		modifiable.setStackInSlot(handlerIndex, displayed.copy());
 		onSlotChanged();
-		if (isInitialized()) getSyncHandler().checkUpdate();
+		syncDisplay();
+	}
+
+	private void syncDisplay() {
+		if (isInitialized()
+				&& getSyncHandler().isValid()
+				&& !getSyncHandler().getSyncManager().isClient()) {
+			// The client consumes its capped snapshot optimistically. The server may
+			// still show 64, so normal change detection cannot repair that snapshot.
+			getSyncHandler().forceSyncItem();
+		}
 	}
 }
