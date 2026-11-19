@@ -31,7 +31,6 @@ import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.cleanroommc.modularui.widget.Widget;
 import com.cleanroommc.modularui.widgets.CycleButtonWidget;
 import com.cleanroommc.modularui.widgets.DynamicSyncedWidget;
-import com.cleanroommc.modularui.widgets.ListWidget;
 import com.cleanroommc.modularui.widgets.PageButton;
 import com.cleanroommc.modularui.widgets.PagedWidget;
 import com.cleanroommc.modularui.widgets.ToggleButton;
@@ -184,8 +183,8 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 		int columns = Math.max(
 				Math.min(16, patternColumns),
 				Math.max(1, Math.min(16, GregifiedEnergisticsConfig.guiConfig.substitutionSlotsPerLine)));
-		ModularPanel panel =
-				GTGuis.createPanel(this, Math.max(199, (int) Math.ceil((columns * 18 + 10) / 0.9) + 14), 200);
+		ModularPanel panel = GTGuis.createPanel(
+				this, Math.min(300, Math.max(199, (int) Math.ceil((columns * 18 + 10) / 0.9) + 14)), 200);
 
 		var controller = new PagedWidget.Controller();
 
@@ -333,7 +332,9 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 					.minElementMargin(0)
 					.minColWidth(18)
 					.minRowHeight(18)
-					.coverChildren()
+					.widthRel(1f)
+					.heightRel(1f)
+					.scrollable()
 					.mapTo(
 							Math.max(1, Math.min(16, GregifiedEnergisticsConfig.guiConfig.substitutionSlotsPerLine)),
 							names,
@@ -345,10 +346,7 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 				.left(7)
 				.widthRel(1f)
 				.child(IKey.lang("gregifiedenergistics.gui.substitution_list").asWidget())
-				.child(new ListWidget<>()
-						.widthRel(1f)
-						.height(160)
-						.child(new DynamicSyncedWidget<>().coverChildren().syncHandler(options)));
+				.child(new DynamicSyncedWidget<>().widthRel(1f).height(78).syncHandler(options));
 	}
 
 	@Override

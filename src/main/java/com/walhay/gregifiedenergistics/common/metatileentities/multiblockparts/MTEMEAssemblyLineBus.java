@@ -9,7 +9,6 @@ import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.cleanroommc.modularui.value.sync.SyncHandlers;
 import com.cleanroommc.modularui.widget.Widget;
-import com.cleanroommc.modularui.widgets.ListWidget;
 import com.cleanroommc.modularui.widgets.SlotGroupWidget;
 import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.layout.Grid;
@@ -71,28 +70,27 @@ public class MTEMEAssemblyLineBus extends MTEAbstractAssemblyLineBus {
 				.horizontalCenter()
 				.coverChildrenHeight()
 				.child(IKey.lang("gregifiedenergistics.gui.pattern_list").asWidget())
-				.child(new ListWidget<>()
+				.child(new Grid()
 						.widthRel(1f)
 						.height(78)
-						.child(new Grid()
-								.minElementMargin(0)
-								.minColWidth(18)
-								.minRowHeight(18)
-								.coverChildren()
-								.horizontalCenter()
-								.mapTo(
-										columns,
-										patternHandler.getSlots(),
-										index -> new ItemSlot()
-												.slot(SyncHandlers.itemSlot(patternHandler, index)
-														.slotGroup("item_inv")
-														.changeListener((newItem, onlyAmountChanged, client, init) ->
-																patternHandler.onContentsChanged(index)))
-												.background(
-														GTGuiTextures.SLOT,
-														GregifiedEnergisticsGuiTextures.PATTERN_OVERLAY
-																.asIcon()
-																.size(16)))));
+						.scrollable()
+						.minElementMargin(0)
+						.minColWidth(18)
+						.minRowHeight(18)
+						.horizontalCenter()
+						.mapTo(
+								columns,
+								patternHandler.getSlots(),
+								index -> new ItemSlot()
+										.slot(SyncHandlers.itemSlot(patternHandler, index)
+												.slotGroup("item_inv")
+												.changeListener((newItem, onlyAmountChanged, client, init) ->
+														patternHandler.onContentsChanged(index)))
+										.background(
+												GTGuiTextures.SLOT,
+												GregifiedEnergisticsGuiTextures.PATTERN_OVERLAY
+														.asIcon()
+														.size(16))));
 	}
 
 	@Override

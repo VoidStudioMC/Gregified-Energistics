@@ -17,6 +17,7 @@ import com.cleanroommc.modularui.screen.UISettings;
 import com.cleanroommc.modularui.value.sync.BooleanSyncValue;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.cleanroommc.modularui.value.sync.SyncHandlers;
+import com.cleanroommc.modularui.widgets.ListWidget;
 import com.cleanroommc.modularui.widgets.SlotGroupWidget;
 import com.cleanroommc.modularui.widgets.ToggleButton;
 import com.cleanroommc.modularui.widgets.layout.Flow;
@@ -292,10 +293,12 @@ public class MTEMEPatternProvider extends MetaTileEntityCraftingProvider<IAEItem
 		int rowSize = (int) Math.sqrt(getInventorySize());
 		panelSyncManager.registerSlotGroup("item_inv", rowSize);
 
+		int gridHeight = rowSize * 18;
+		int viewportHeight = Math.min(126, gridHeight);
 		int backgroundWidth = Math.max(
 				9 * 18 + 18 + 14 + 5, // Player Inv width
-				rowSize * 18 + 14); // Bus Inv width
-		int backgroundHeight = 18 + 18 * rowSize + 94;
+				rowSize * 18 + 22); // Bus Inv width and scrollbar
+		int backgroundHeight = 18 + viewportHeight + 94;
 
 		Icon detail = GTGuiTextures.BUTTON_POWER_DETAIL.asIcon().size(18, 6).marginTop(24);
 
@@ -305,25 +308,30 @@ public class MTEMEPatternProvider extends MetaTileEntityCraftingProvider<IAEItem
 		return GTGuis.createPanel(this, backgroundWidth, backgroundHeight)
 				.child(IKey.lang(getMetaFullName()).asWidget().pos(5, 5))
 				.child(SlotGroupWidget.playerInventory(false).left(7).bottom(7))
-				.child(new Grid()
+				.child(new ListWidget<>()
 						.top(18)
-						.height(rowSize * 18)
-						.minElementMargin(0, 0)
-						.minColWidth(18)
-						.minRowHeight(18)
+						.width(rowSize * 18 + 8)
+						.height(viewportHeight)
 						.horizontalCenter()
-						.mapTo(
-								rowSize,
-								rowSize * rowSize,
-								index -> new ItemSlot()
-										.slot(SyncHandlers.itemSlot(importItems, index)
-												.slotGroup("item_inv")
-												.changeListener((newItem, onlyAmountChanged, client, init) -> {
-													if (onlyAmountChanged
-															&& importItems instanceof GTItemStackHandler gtHandler) {
-														gtHandler.onContentsChanged(index);
-													}
-												}))))
+						.child(new Grid()
+								.coverChildren()
+								.minElementMargin(0, 0)
+								.minColWidth(18)
+								.minRowHeight(18)
+								.horizontalCenter()
+								.mapTo(
+										rowSize,
+										rowSize * rowSize,
+										index -> new ItemSlot()
+												.slot(SyncHandlers.itemSlot(importItems, index)
+														.slotGroup("item_inv")
+														.changeListener((newItem, onlyAmountChanged, client, init) -> {
+															if (onlyAmountChanged
+																	&& importItems
+																			instanceof GTItemStackHandler gtHandler) {
+																gtHandler.onContentsChanged(index);
+															}
+														})))))
 				.child(Flow.column()
 						.pos(backgroundWidth - 7 - 18, backgroundHeight - 18 * 4 - 7 - 5)
 						.width(18)
