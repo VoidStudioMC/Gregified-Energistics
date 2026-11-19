@@ -12,7 +12,7 @@ plugins {
     id 'org.jetbrains.gradle.plugin.idea-ext' version '1.1.9'
     id 'com.gtnewhorizons.retrofuturagradle' version '1.4.9'
     id 'com.matthewprenger.cursegradle' version '1.4.0' apply false
-    id 'com.modrinth.minotaur' version '2.+' apply false
+    id 'com.modrinth.minotaur' version '2.10.0' apply false
     id 'org.jetbrains.changelog' version '2.2.1'
 	id "com.diffplug.spotless" version "7.1.0"
 }
@@ -49,7 +49,7 @@ base {
     archivesName.set(propertyString('mod_id'))
 }
 
-tasks.decompressDecompiledSources.enabled !propertyBool('change_minecraft_sources')
+tasks.decompressDecompiledSources.enabled = !propertyBool('change_minecraft_sources')
 
 java {
     toolchain {
@@ -105,8 +105,8 @@ minecraft {
 
 repositories {
     maven {
-        name 'CleanroomMC Maven'
-        url 'https://maven.cleanroommc.com'
+        name = 'CleanroomMC Maven'
+        url = 'https://maven.cleanroommc.com'
     }
     mavenCentral()
 }
@@ -149,7 +149,7 @@ dependencies {
 
     compileOnly 'org.jetbrains:annotations:26.0.2'
 
-	implementation fileTree(include: ['*.jar'], dir: 'libs')
+	implementation fileTree(include: ['*.jar'], exclude: ['*-sources.jar'], dir: 'libs')
 }
 
 apply from: 'gradle/scripts/dependencies.gradle'
@@ -364,3 +364,4 @@ idea.project.settings {
 apply from: 'gradle/scripts/publishing.gradle'
 apply from: 'gradle/scripts/extra.gradle'
 apply from: 'gradle/scripts/spotless.gradle'
+apply from: 'gradle/scripts/verification.gradle'

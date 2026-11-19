@@ -1,0 +1,42 @@
+import java.security.MessageDigest
+
+// Resolve only the configurations used for compilation/tests; RFG has separate generated Minecraft scopes.
+def lockedConfigurations = ['compileClasspath', 'runtimeClasspath', 'testCompileClasspath',
+                            'testRuntimeClasspath', 'annotationProcessor', 'testAnnotationProcessor']
+configurations.matching { it.name in lockedConfigurations }.configureEach {
+    resolutionStrategy.activateDependencyLocking()
+}
+
+tasks.register('verifyBundledDependencies') {
+    group = 'verification'
+    description = 'Checks the pinned GregTech binaries and their accompanying sources.'
+    def manifest = file('gradle/bundled-dependencies.sha256')
+    def bundled = fileTree(dir: 'libs', include: ['*.jar'])
+    def baseDirectory = project.projectDir
+    inputs.file(manifest)
+    inputs.files(bundled)
+    doLast {
+        def expected = [:]
+        manifest.eachLine { line ->
+            def entry = line.split('  ', 2)
+            if (entry.length != 2 || !(entry[0] ==~ /[0-9a-f]{64}/)) {
+                throw new GradleException('Invalid bundled dependency checksum entry')
+            }
+            expected[entry[1]] = entry[0]
+        }
+        def artifacts = bundled.files.collectEntries { artifact ->
+            def path = baseDirectory.toPath().relativize(artifact.toPath()).toString().replace(File.separator, '/')
+            [(path): artifact]
+        }
+        if (artifacts.keySet() != expected.keySet()) {
+            throw new GradleException('Bundled dependency list changed; review libs and update gradle/bundled-dependencies.sha256')
+        }
+        artifacts.each { path, artifact ->
+            def checksum = MessageDigest.getInstance('SHA-256').digest(artifact.bytes).encodeHex().toString()
+            if (checksum != expected[path]) {
+                throw new GradleException("Bundled dependency checksum mismatch: ${artifact.name}")
+            }
+        }
+    }
+}
+tasks.named('compileJava').configure { dependsOn 'verifyBundledDependencies' }

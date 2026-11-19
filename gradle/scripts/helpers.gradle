@@ -42,7 +42,12 @@ String interpolate(String value) {
         return new GroovyShell(this.getClass().getClassLoader(), newBinding).evaluate(value)
     }
     if (value.contains('${')) {
-        return new SimpleTemplateEngine().createTemplate(value).make(project.properties).toString()
+        def templateProperties = new LinkedHashMap(project.extensions.extraProperties.properties)
+        templateProperties.putAll([
+                project: project, name: project.name, version: project.version, group: project.group,
+                projectDir: project.projectDir, rootDir: project.rootDir
+        ])
+        return new SimpleTemplateEngine().createTemplate(value).make(templateProperties).toString()
     }
     return value
 }

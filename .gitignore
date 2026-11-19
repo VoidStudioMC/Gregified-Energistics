@@ -23,6 +23,7 @@ build
 # other
 eclipse
 run
+/logs/
 
 # mac
 .DS_Store
