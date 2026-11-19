@@ -25,10 +25,12 @@ import com.cleanroommc.modularui.factory.PosGuiData;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.UISettings;
 import com.cleanroommc.modularui.value.sync.BooleanSyncValue;
+import com.cleanroommc.modularui.value.sync.DynamicSyncHandler;
 import com.cleanroommc.modularui.value.sync.EnumSyncValue;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.cleanroommc.modularui.widget.Widget;
 import com.cleanroommc.modularui.widgets.CycleButtonWidget;
+import com.cleanroommc.modularui.widgets.DynamicSyncedWidget;
 import com.cleanroommc.modularui.widgets.ListWidget;
 import com.cleanroommc.modularui.widgets.PageButton;
 import com.cleanroommc.modularui.widgets.PagedWidget;
@@ -36,7 +38,6 @@ import com.cleanroommc.modularui.widgets.ToggleButton;
 import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.layout.Grid;
 import com.cleanroommc.modularui.widgets.slot.ItemSlot;
-import com.google.common.collect.Lists;
 import com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig;
 import com.walhay.gregifiedenergistics.api.capability.InfiniteItemStackHandler;
 import com.walhay.gregifiedenergistics.api.metatileentity.MetaTileEntityCraftingProvider;
@@ -308,6 +309,38 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 	}
 
 	public Widget<?> createSubstitutionList(ModularPanel panel, PanelSyncManager syncHandler) {
+		DynamicSyncHandler options = new DynamicSyncHandler() {
+			private List<String> sentOptions;
+
+			@Override
+			public void detectAndSendChanges(boolean init) {
+				List<String> names = new java.util.ArrayList<>(substitutionStorage.getOptions());
+				if (init || !names.equals(sentOptions)) {
+					sentOptions = names;
+					notifyUpdate(buf -> {
+						buf.writeVarInt(names.size());
+						for (String name : names) buf.writeString(name);
+					});
+				}
+			}
+		}.widgetProvider((manager, buf) -> {
+			int count = buf.readVarInt();
+			if (count < 0 || count > buf.readableBytes())
+				throw new IllegalArgumentException("Invalid substitution GUI size");
+			List<String> names = new java.util.ArrayList<>(count);
+			for (int i = 0; i < count; ++i) names.add(buf.readString(32767));
+			return new Grid()
+					.minElementMargin(0)
+					.minColWidth(18)
+					.minRowHeight(18)
+					.coverChildren()
+					.mapTo(
+							Math.max(1, Math.min(16, GregifiedEnergisticsConfig.guiConfig.substitutionSlotsPerLine)),
+							names,
+							(index, name) -> (Widget<?>)
+									new SubstitutionSlotWidget().storage(substitutionStorage, name, manager));
+		});
+		syncHandler.syncValue("substitution_list", options);
 		return Flow.column()
 				.left(7)
 				.widthRel(1f)
@@ -315,20 +348,7 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 				.child(new ListWidget<>()
 						.widthRel(1f)
 						.height(160)
-						.child(new Grid()
-								.minElementMargin(0)
-								.minColWidth(18)
-								.minRowHeight(18)
-								.coverChildren()
-								.mapTo(
-										Math.max(
-												1,
-												Math.min(
-														16,
-														GregifiedEnergisticsConfig.guiConfig.substitutionSlotsPerLine)),
-										Lists.newArrayList(substitutionStorage.getOptions()),
-										(index, name) -> (Widget<?>)
-												new SubstitutionSlotWidget().storage(substitutionStorage, name))));
+						.child(new DynamicSyncedWidget<>().coverChildren().syncHandler(options)));
 	}
 
 	@Override

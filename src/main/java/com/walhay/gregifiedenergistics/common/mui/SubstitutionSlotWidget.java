@@ -8,9 +8,11 @@ import com.cleanroommc.modularui.api.widget.Interactable;
 import com.cleanroommc.modularui.drawable.ItemDrawable;
 import com.cleanroommc.modularui.utils.Alignment;
 import com.cleanroommc.modularui.utils.MouseData;
+import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.cleanroommc.modularui.value.sync.SyncHandler;
 import com.cleanroommc.modularui.widget.Widget;
 import com.cleanroommc.modularui.widgets.ButtonWidget;
+import com.cleanroommc.modularui.widgets.ListWidget;
 import com.cleanroommc.modularui.widgets.layout.Grid;
 import com.walhay.gregifiedenergistics.api.patterns.ISubstitutionStorage;
 import gregtech.api.mui.GTGuiTextures;
@@ -29,7 +31,6 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 	private ISubstitutionStorage storage;
 	private SubstituionSyncHandler syncHandler;
 	private String name;
-	private IPanelHandler selectorPanel;
 	private ItemDrawable itemPreview;
 
 	public SubstitutionSlotWidget() {
@@ -44,11 +45,12 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 		});
 	}
 
-	public SubstitutionSlotWidget storage(ISubstitutionStorage storage, String name) {
+	public SubstitutionSlotWidget storage(ISubstitutionStorage storage, String name, PanelSyncManager manager) {
 		this.name = name;
 		this.storage = storage;
 		this.items = storage.getCandidates(name);
-		this.syncHandler = new SubstituionSyncHandler(storage, name);
+		this.syncHandler = manager.getOrCreateSyncHandler(
+				"substitution:" + name, SubstituionSyncHandler.class, () -> new SubstituionSyncHandler(storage, name));
 		setSyncOrValue(syncHandler);
 
 		return this;
@@ -74,45 +76,85 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 	}
 
 	private IPanelHandler selectorPanel() {
-		if (selectorPanel == null) {
-			selectorPanel = IPanelHandler.simple(
+		if (syncHandler.selectorPanel == null) {
+			syncHandler.selectorPanel = IPanelHandler.simple(
 					getPanel(),
 					(parentPanel, player) -> {
-						int height = (int) Math.ceil(items.size() / 5.0f);
-
-						var selectedItem = items.isEmpty() ? ItemStack.EMPTY : items.get(syncHandler.getOption());
-						return GTGuis.createPopupPanel("selector_panel_" + name, 104, height * 18 + 50)
+						ItemDrawable preview = new ItemDrawable();
+						return GTGuis.createPopupPanel("selector_panel_" + name, 110, 176)
 								.child(IKey.lang("gregifiedenergistics.gui.substitution")
 										.asWidget()
 										.pos(5, 5))
 								.child(new Widget<>()
 										.size(18)
 										.top(19)
-										.tooltip(rt -> rt.addFromItem(selectedItem))
+										.tooltipAutoUpdate(true)
+										.tooltipBuilder(rt -> {
+											ItemStack selected = selectedItem();
+											if (!selected.isEmpty()) rt.addFromItem(selected);
+										})
+										.onUpdateListener(w -> preview.setItem(selectedItem()))
 										.horizontalCenter()
 										.background(GTGuiTextures.SLOT)
-										.overlay(itemPreview.asIcon().margin(1)))
-								.child(new Grid()
-										.horizontalCenter()
-										.top(41)
-										.minElementMargin(0)
-										.minColWidth(18)
-										.minRowHeight(18)
-										.mapTo(
-												Math.max(1, Math.min(5, items.size())),
-												items,
-												(index, element) -> (Widget<?>) new ButtonWidget<>()
-														.background(GTGuiTextures.SLOT)
-														.overlay(new ItemDrawable(element)
-																.asIcon()
-																.margin(1))
-														.tooltip(rt -> rt.addFromItem(element))
-														.onMousePressed(button ->
-																this.syncHandler.setSubstitutionItem(element))));
+										.overlay(preview.asIcon().margin(1)))
+								.child(new CandidateList().pos(5, 41).size(100, 126));
 					},
 					true);
 		}
-		return selectorPanel;
+		return syncHandler.selectorPanel;
+	}
+
+	@Override
+	public void dispose() {
+		if (syncHandler.selectorPanel != null) {
+			syncHandler.selectorPanel.closePanel();
+		}
+		super.dispose();
+	}
+
+	private class CandidateList extends ListWidget<Widget<?>, CandidateList> {
+		private List<ItemStack> shown;
+
+		@Override
+		public void onUpdate() {
+			super.onUpdate();
+			List<ItemStack> candidates = storage.getCandidates(name);
+			if (sameCandidates(shown, candidates)) return;
+			shown = candidates;
+			removeAll();
+			child(new Grid()
+					.minElementMargin(0)
+					.minColWidth(18)
+					.minRowHeight(18)
+					.coverChildren()
+					.mapTo(
+							Math.max(1, Math.min(5, candidates.size())),
+							candidates,
+							(index, item) -> candidateButton(item)));
+			scheduleResize();
+		}
+	}
+
+	private Widget<?> candidateButton(ItemStack item) {
+		return new ButtonWidget<>()
+				.size(18)
+				.background(GTGuiTextures.SLOT)
+				.overlay(new ItemDrawable(item).asIcon().margin(1))
+				.tooltip(rt -> rt.addFromItem(item))
+				.onMousePressed(button -> syncHandler.setSubstitutionItem(item));
+	}
+
+	private ItemStack selectedItem() {
+		List<ItemStack> candidates = storage.getCandidates(name);
+		return candidates.isEmpty() ? ItemStack.EMPTY : candidates.get(syncHandler.getOption());
+	}
+
+	private static boolean sameCandidates(List<ItemStack> first, List<ItemStack> second) {
+		if (first == null || first.size() != second.size()) return false;
+		for (int i = 0; i < first.size(); ++i) {
+			if (!ItemStack.areItemStacksEqual(first.get(i), second.get(i))) return false;
+		}
+		return true;
 	}
 
 	@Override
@@ -138,7 +180,10 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 		return true;
 	}
 
-	public class SubstituionSyncHandler extends SyncHandler {
+	public static class SubstituionSyncHandler extends SyncHandler {
+
+		// Stable across dynamic grid rebuilds; MUI identifies secondary panels by name.
+		private IPanelHandler selectorPanel;
 
 		private final ISubstitutionStorage storage;
 		private final String name;
