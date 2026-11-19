@@ -308,21 +308,7 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 	}
 
 	public Widget<?> createSubstitutionList(ModularPanel panel, PanelSyncManager syncHandler) {
-		DynamicSyncHandler options = new DynamicSyncHandler() {
-			private List<String> sentOptions;
-
-			@Override
-			public void detectAndSendChanges(boolean init) {
-				List<String> names = new java.util.ArrayList<>(substitutionStorage.getOptions());
-				if (init || !names.equals(sentOptions)) {
-					sentOptions = names;
-					notifyUpdate(buf -> {
-						buf.writeVarInt(names.size());
-						for (String name : names) buf.writeString(name);
-					});
-				}
-			}
-		}.widgetProvider((manager, buf) -> {
+		DynamicSyncHandler options = new DynamicSyncHandler().widgetProvider((manager, buf) -> {
 			int count = buf.readVarInt();
 			if (count < 0 || count > buf.readableBytes())
 				throw new IllegalArgumentException("Invalid substitution GUI size");
@@ -340,6 +326,22 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 							names,
 							(index, name) -> (Widget<?>)
 									new SubstitutionSlotWidget().storage(substitutionStorage, name, manager));
+		});
+		// New ingredient handlers must be registered outside the handler-map iteration.
+		syncHandler.onServerTick(new Runnable() {
+			private List<String> sentOptions;
+
+			@Override
+			public void run() {
+				List<String> names = new java.util.ArrayList<>(substitutionStorage.getOptions());
+				if (!names.equals(sentOptions)) {
+					sentOptions = names;
+					options.notifyUpdate(buf -> {
+						buf.writeVarInt(names.size());
+						for (String name : names) buf.writeString(name);
+					});
+				}
+			}
 		});
 		syncHandler.syncValue("substitution_list", options);
 		return Flow.column()
