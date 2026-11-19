@@ -4,8 +4,9 @@ import com.github.bsideup.jabel.Desugar;
 import gregtech.api.capability.impl.ItemHandlerList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedList;
+import java.util.List;
 import java.util.Objects;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.items.IItemHandler;
@@ -19,7 +20,7 @@ import net.minecraftforge.items.IItemHandlerModifiable;
  */
 public class SegmentItemHandlerList implements IItemHandlerModifiable {
 
-	private final LinkedList<IItemHandler> handlers = new LinkedList<>();
+	private final List<IItemHandler> handlers = new ArrayList<>();
 	private final IntList prefix = new IntArrayList();
 
 	public SegmentItemHandlerList(IItemHandler... handlers) {
@@ -48,6 +49,7 @@ public class SegmentItemHandlerList implements IItemHandlerModifiable {
 	}
 
 	public void addHandler(IItemHandler handler) {
+		Objects.requireNonNull(handler, "handler");
 		if (handlers.contains(handler)) return;
 
 		handlers.add(handler);
@@ -77,7 +79,8 @@ public class SegmentItemHandlerList implements IItemHandlerModifiable {
 
 	protected HandlerEntry getHandlerByGlobalIndex(int index) {
 		refreshHandlerSizes();
-		if (index < 0 || index >= getSlots()) return new HandlerEntry(null, 0);
+		int totalSlots = prefix.isEmpty() ? 0 : prefix.get(prefix.size() - 1);
+		if (index < 0 || index >= totalSlots) return new HandlerEntry(null, 0);
 
 		int handlerIndex = upperBound(prefix, index);
 
@@ -129,9 +132,7 @@ public class SegmentItemHandlerList implements IItemHandlerModifiable {
 		if (entry.handler != null && entry.handler instanceof IItemHandlerModifiable modifiable) {
 			modifiable.setStackInSlot(slot - entry.index, stack);
 		} else if (entry.handler != null) {
-			int localSlot = slot - entry.index;
-			entry.handler.extractItem(localSlot, Integer.MAX_VALUE, false);
-			entry.handler.insertItem(localSlot, stack, false);
+			throw new UnsupportedOperationException("Delegate does not support assigning slot contents");
 		}
 	}
 
