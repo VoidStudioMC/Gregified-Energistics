@@ -2,9 +2,11 @@ package com.walhay.gregifiedenergistics.api.patterns.implementations;
 
 import com.walhay.gregifiedenergistics.api.patterns.AbstractPatternHelper;
 import com.walhay.gregifiedenergistics.api.patterns.RecipeFingerprint;
+import com.walhay.gregifiedenergistics.api.patterns.substitutions.AESubstitutionStorage;
 import gregtech.api.recipes.Recipe;
 import javax.annotation.Nonnull;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 
 public class RecipePatternHelper extends AbstractPatternHelper {
 
@@ -34,6 +36,16 @@ public class RecipePatternHelper extends AbstractPatternHelper {
 
 	public Recipe getRecipe() {
 		return recipe;
+	}
+
+	/** Detaches an active CPU task's inputs and choices from subsequent provider edits. */
+	public RecipePatternHelper snapshotForTask() {
+		RecipePatternHelper snapshot = new RecipePatternHelper(recipe, item);
+		snapshot.injectSubstitutions(new AESubstitutionStorage(
+				substitutionStorage == null ? new NBTTagCompound() : substitutionStorage.serializeNBT()));
+		snapshot.setPriority(getPriority());
+		snapshot.validRecipe &= validRecipe;
+		return snapshot;
 	}
 
 	@Override

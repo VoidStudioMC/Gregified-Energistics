@@ -32,6 +32,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(CraftingCPUCluster.class)
@@ -59,6 +60,15 @@ public abstract class CraftingCPUClusterMixin {
 	@Unique private boolean gregified$cancelPending;
 
 	@Unique private NBTTagList gregified$unresolvedTasks = new NBTTagList();
+
+	@ModifyVariable(
+			method = "addCrafting(Lappeng/api/networking/crafting/ICraftingPatternDetails;J)V",
+			at = @At("HEAD"),
+			argsOnly = true,
+			remap = false)
+	private ICraftingPatternDetails gregified$snapshotRecipeTask(ICraftingPatternDetails pattern) {
+		return pattern instanceof RecipePatternHelper helper ? helper.snapshotForTask() : pattern;
+	}
 
 	@Inject(method = "writeToNBT", at = @At("TAIL"), remap = false)
 	private void gregified$writeTasks(NBTTagCompound data, CallbackInfo ci) {
