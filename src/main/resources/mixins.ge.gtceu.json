@@ -1,4 +1,5 @@
 {
+  "required" : true,
   "package" : "com.walhay.gregifiedenergistics.mixins.gtceu",
   "refmap" : "mixins.gregifiedenergistics.refmap.json",
   "target" : "@env(DEFAULT)",
