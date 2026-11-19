@@ -35,8 +35,8 @@ public abstract class DataAccessHatchMixin extends MetaTileEntityMultiblockNotif
 	}
 
 	@Override
-	@Unique public void onRecipesUpdate(Collection<INetRecipeHandler> seen) {
-		seen.add(this);
+	@Unique public void onRecipesUpdate(Set<INetRecipeHandler> seen) {
+		if (!seen.add(this)) return;
 
 		if (isAttachedToMultiBlock() && getController() instanceof INetRecipeHandler handler) {
 			if (seen.contains(handler)) return;
@@ -46,8 +46,8 @@ public abstract class DataAccessHatchMixin extends MetaTileEntityMultiblockNotif
 	}
 
 	@Override
-	@Unique public Collection<Recipe> getRecipes(Collection<INetRecipeHandler> seen) {
-		seen.add(this);
+	@Unique public Collection<Recipe> getRecipes(Set<INetRecipeHandler> seen) {
+		if (!seen.add(this)) return null;
 
 		return recipes;
 	}

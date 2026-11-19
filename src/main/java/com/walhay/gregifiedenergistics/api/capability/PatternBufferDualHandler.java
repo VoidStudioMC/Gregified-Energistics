@@ -19,6 +19,7 @@ public class PatternBufferDualHandler extends DualHandler {
 	private final GhostCircuitItemStackHandler circuitInventory;
 
 	private List<IMultipleTankHandler.ITankEntry> tanks = Collections.emptyList();
+	private long fluidRevision;
 
 	@Override
 	public @NotNull ItemStack getStackInSlot(int slot) {
@@ -44,6 +45,11 @@ public class PatternBufferDualHandler extends DualHandler {
 			replacement.add(new DualEntry(this, entry));
 		}
 		this.tanks = Collections.unmodifiableList(replacement);
+		fluidRevision++;
+	}
+
+	public long getFluidRevision() {
+		return fluidRevision;
 	}
 
 	@Override

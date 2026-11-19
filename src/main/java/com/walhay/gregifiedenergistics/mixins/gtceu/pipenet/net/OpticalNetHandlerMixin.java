@@ -9,6 +9,7 @@ import gregtech.common.pipelike.optical.net.OpticalPipeNet;
 import gregtech.common.pipelike.optical.net.OpticalRoutePath;
 import gregtech.common.pipelike.optical.tile.TileEntityOpticalPipe;
 import java.util.Collection;
+import java.util.Set;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Final;
@@ -43,18 +44,20 @@ public abstract class OpticalNetHandlerMixin implements INetRecipeHandler {
 	protected abstract void callSetPipesActive();
 
 	@Override
-	@Unique public void onRecipesUpdate(Collection<INetRecipeHandler> seen) {
+	@Unique public void onRecipesUpdate(Set<INetRecipeHandler> seen) {
+		if (!seen.add(this)) return;
 		traverseOnUpdate(seen);
 	}
 
 	@Override
-	@Unique public Collection<Recipe> getRecipes(Collection<INetRecipeHandler> seen) {
+	@Unique public Collection<Recipe> getRecipes(Set<INetRecipeHandler> seen) {
+		if (!seen.add(this)) return null;
 		var recipes = traverseGetRecipes(seen);
 		if (recipes != null) callSetPipesActive();
 		return recipes;
 	}
 
-	@Unique private void traverseOnUpdate(Collection<INetRecipeHandler> seen) {
+	@Unique private void traverseOnUpdate(Set<INetRecipeHandler> seen) {
 		if (callIsNetInvalidForTraversal()) return;
 
 		OpticalRoutePath inv = net.getNetData(pipe.getPipePos(), facing);
@@ -68,7 +71,7 @@ public abstract class OpticalNetHandlerMixin implements INetRecipeHandler {
 		}
 	}
 
-	@Unique private Collection<Recipe> traverseGetRecipes(Collection<INetRecipeHandler> seen) {
+	@Unique private Collection<Recipe> traverseGetRecipes(Set<INetRecipeHandler> seen) {
 		if (callIsNetInvalidForTraversal()) return null;
 
 		OpticalRoutePath inv = net.getNetData(pipe.getPipePos(), facing);

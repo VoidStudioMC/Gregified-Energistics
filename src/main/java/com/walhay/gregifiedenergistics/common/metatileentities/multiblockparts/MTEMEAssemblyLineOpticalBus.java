@@ -21,6 +21,7 @@ import gregtech.common.pipelike.optical.tile.TileEntityOpticalPipe;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
@@ -212,14 +213,14 @@ public class MTEMEAssemblyLineOpticalBus extends MTEAbstractAssemblyLineBus impl
 	}
 
 	@Override
-	public void onRecipesUpdate(Collection<INetRecipeHandler> seen) {
-		seen.add(this);
+	public void onRecipesUpdate(Set<INetRecipeHandler> seen) {
+		if (!seen.add(this)) return;
 		patternDataDirty = true;
 	}
 
 	@Override
-	public Collection<Recipe> getRecipes(Collection<INetRecipeHandler> seen) {
-		seen.add(this);
+	public Collection<Recipe> getRecipes(Set<INetRecipeHandler> seen) {
+		if (!seen.add(this)) return null;
 		return null;
 	}
 

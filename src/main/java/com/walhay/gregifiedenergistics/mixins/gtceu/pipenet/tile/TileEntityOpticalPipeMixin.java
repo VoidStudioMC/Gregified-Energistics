@@ -10,6 +10,7 @@ import gregtech.common.pipelike.optical.net.OpticalNetHandler;
 import gregtech.common.pipelike.optical.tile.TileEntityOpticalPipe;
 import java.util.Collection;
 import java.util.EnumMap;
+import java.util.Set;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.capabilities.Capability;
 import org.spongepowered.asm.mixin.Final;
@@ -45,6 +46,7 @@ public abstract class TileEntityOpticalPipeMixin extends TileEntityPipeBase<Opti
 			if (world.isRemote) {
 				cir.setReturnValue(
 						GregifiedEnergisticsCapabilities.CAPABILITY_RECIPE_HANDLER.cast(clientRecipesHandler));
+				return;
 			}
 
 			if (handlers.isEmpty()) invokeInitHandlers();
@@ -59,10 +61,10 @@ public abstract class TileEntityOpticalPipeMixin extends TileEntityPipeBase<Opti
 	@Unique private static class DefaultRecipesHandler implements INetRecipeHandler {
 
 		@Override
-		public void onRecipesUpdate(Collection<INetRecipeHandler> seen) {}
+		public void onRecipesUpdate(Set<INetRecipeHandler> seen) {}
 
 		@Override
-		public Collection<Recipe> getRecipes(Collection<INetRecipeHandler> seen) {
+		public Collection<Recipe> getRecipes(Set<INetRecipeHandler> seen) {
 			return null;
 		}
 	}
