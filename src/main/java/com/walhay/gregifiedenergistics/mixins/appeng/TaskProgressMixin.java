@@ -17,4 +17,9 @@ public class TaskProgressMixin implements ITaskProgressAccessor {
 	public void setValue(long value) {
 		this.value = value;
 	}
+
+	@Override
+	public long getValue() {
+		return value;
+	}
 }

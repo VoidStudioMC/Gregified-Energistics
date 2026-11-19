@@ -1,5 +1,6 @@
 package com.walhay.gregifiedenergistics.api.util;
 
+import com.walhay.gregifiedenergistics.api.patterns.RecipeFingerprint;
 import gregtech.api.GTValues;
 import gregtech.api.recipes.ingredients.GTRecipeInput;
 import net.minecraftforge.oredict.OreDictionary;
@@ -15,7 +16,7 @@ public class GTHelperUtility {
 			return OreDictionary.getOreName(oreId);
 		}
 
-		return input.toString();
+		return "items:" + RecipeFingerprint.inputKey(input);
 	}
 
 	public static int getTierFromName(String name) {

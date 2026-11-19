@@ -32,7 +32,8 @@ public class GhostCircuitPatternWrapper extends AbstractPatternHelper {
 	}
 
 	public static ICraftingPatternDetails wrap(ICraftingPatternDetails pattern) {
-		if (pattern != null && hasCircuit(pattern.getInputs())) {
+		if (pattern instanceof GhostCircuitPatternWrapper) return pattern;
+		if (pattern != null && !pattern.isCraftable() && hasCircuit(pattern.getInputs())) {
 			return new GhostCircuitPatternWrapper(pattern);
 		}
 		return pattern;
@@ -47,9 +48,11 @@ public class GhostCircuitPatternWrapper extends AbstractPatternHelper {
 	}
 
 	protected static IAEItemStack[] filterCircuits(IAEItemStack[] inputs) {
-		return Arrays.stream(inputs)
-				.filter(stack -> !IntCircuitIngredient.isIntegratedCircuit(stack.getDefinition()))
-				.toArray(IAEItemStack[]::new);
+		return inputs == null
+				? new IAEItemStack[0]
+				: Arrays.stream(inputs)
+						.filter(stack -> !IntCircuitIngredient.isIntegratedCircuit(stack.getDefinition()))
+						.toArray(IAEItemStack[]::new);
 	}
 
 	public int getCircuitValue() {
@@ -124,5 +127,17 @@ public class GhostCircuitPatternWrapper extends AbstractPatternHelper {
 	@Override
 	public IAEItemStack getPrimaryOutput() {
 		return pattern.getPrimaryOutput();
+	}
+
+	@Override
+	public int hashCode() {
+		return 31 * pattern.hashCode() + option;
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return other instanceof GhostCircuitPatternWrapper wrapper
+				&& option == wrapper.option
+				&& pattern.equals(wrapper.pattern);
 	}
 }

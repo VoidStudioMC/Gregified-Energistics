@@ -15,7 +15,6 @@ import com.cleanroommc.modularui.widgets.layout.Grid;
 import com.walhay.gregifiedenergistics.api.patterns.ISubstitutionStorage;
 import gregtech.api.mui.GTGuiTextures;
 import gregtech.api.mui.GTGuis;
-import gregtech.api.unification.OreDictUnifier;
 import gregtech.client.utils.TooltipHelper;
 import java.io.IOException;
 import java.util.List;
@@ -26,7 +25,8 @@ import org.jetbrains.annotations.NotNull;
 
 public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> implements Interactable {
 
-	private List<ItemStack> items;
+	private List<ItemStack> items = java.util.Collections.emptyList();
+	private ISubstitutionStorage storage;
 	private SubstituionSyncHandler syncHandler;
 	private String name;
 	private IPanelHandler selectorPanel;
@@ -37,13 +37,18 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 		background(GTGuiTextures.SLOT);
 		this.itemPreview = new ItemDrawable();
 		overlay(itemPreview.asIcon().alignment(Alignment.CENTER));
-		onUpdateListener(w -> itemPreview.setItem(items.get(syncHandler.getOption())));
+		onUpdateListener(w -> {
+			if (storage == null || syncHandler == null) return;
+			items = storage.getCandidates(name);
+			itemPreview.setItem(items.isEmpty() ? ItemStack.EMPTY : items.get(syncHandler.getOption()));
+		});
 	}
 
 	public SubstitutionSlotWidget storage(ISubstitutionStorage storage, String name) {
 		this.name = name;
-		this.items = OreDictUnifier.getAllWithOreDictionaryName(name);
-		this.syncHandler = new SubstituionSyncHandler(storage, name, items.size());
+		this.storage = storage;
+		this.items = storage.getCandidates(name);
+		this.syncHandler = new SubstituionSyncHandler(storage, name);
 		setSyncOrValue(syncHandler);
 
 		return this;
@@ -53,14 +58,14 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 	public void onInit() {
 		tooltip().setAutoUpdate(true);
 		tooltip().tooltipBuilder(rt -> {
-			rt.addFromItem(items.get(syncHandler.getOption()));
+			if (!items.isEmpty()) rt.addFromItem(items.get(syncHandler.getOption()));
 			rt.addLine(IKey.lang("gregifiedenergistics.gui.substitution_hint"));
 		});
 	}
 
 	@Override
 	public boolean isValidSyncOrValue(@NotNull ISyncOrValue syncOrValue) {
-		return syncHandler instanceof SubstituionSyncHandler;
+		return syncOrValue instanceof SubstituionSyncHandler;
 	}
 
 	@Override
@@ -75,7 +80,7 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 					(parentPanel, player) -> {
 						int height = (int) Math.ceil(items.size() / 5.0f);
 
-						var selectedItem = items.get(syncHandler.getOption());
+						var selectedItem = items.isEmpty() ? ItemStack.EMPTY : items.get(syncHandler.getOption());
 						return GTGuis.createPopupPanel("selector_panel_" + name, 104, height * 18 + 50)
 								.child(IKey.lang("gregifiedenergistics.gui.substitution")
 										.asWidget()
@@ -94,7 +99,7 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 										.minColWidth(18)
 										.minRowHeight(18)
 										.mapTo(
-												Math.min(5, items.size()),
+												Math.max(1, Math.min(5, items.size())),
 												items,
 												(index, element) -> (Widget<?>) new ButtonWidget<>()
 														.background(GTGuiTextures.SLOT)
@@ -102,8 +107,8 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 																.asIcon()
 																.margin(1))
 														.tooltip(rt -> rt.addFromItem(element))
-														.onMousePressed(
-																button -> this.syncHandler.setSubstitution(index))));
+														.onMousePressed(button ->
+																this.syncHandler.setSubstitutionItem(element))));
 					},
 					true);
 		}
@@ -114,7 +119,7 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 	public @NotNull Result onMousePressed(int mouseButton) {
 		// Input can arrive during the parent screen's closing animation. Do not open or
 		// close a cached secondary panel after its parent has been detached.
-		if (getPanel() == null || !getPanel().isOpen()) return Result.ACCEPT;
+		if (getPanel() == null || !getPanel().isOpen() || items.isEmpty()) return Result.ACCEPT;
 
 		if (mouseButton == 0 && TooltipHelper.isShiftDown()) {
 			selectorPanel().togglePanel();
@@ -127,6 +132,7 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 
 	@Override
 	public boolean onMouseScroll(UpOrDown scrollDirection, int amount) {
+		if (getPanel() == null || !getPanel().isOpen() || items.isEmpty()) return false;
 		MouseData mouseData = MouseData.create(scrollDirection.modifier);
 		syncHandler.syncToServer(3, mouseData::writeToPacket);
 		return true;
@@ -136,44 +142,65 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 
 		private final ISubstitutionStorage storage;
 		private final String name;
-		private final int options;
 		public static final int SET_SUBSTITUTION = 0;
 
-		public SubstituionSyncHandler(ISubstitutionStorage storage, String name, int options) {
+		public SubstituionSyncHandler(ISubstitutionStorage storage, String name) {
 			this.storage = storage;
 			this.name = name;
-			this.options = options;
 		}
 
 		@Override
 		public void readOnClient(int id, PacketBuffer buf) throws IOException {
-			if (id == SET_SUBSTITUTION) {
-				setSubstitution(buf.readVarInt());
-			}
+			if (id == SET_SUBSTITUTION) readSelection(buf, false);
 		}
 
 		@Override
 		public void readOnServer(int id, PacketBuffer buf) throws IOException {
-			if (id == SET_SUBSTITUTION) {
-				setSubstitution(buf.readVarInt());
-			} else if (id == 2) {
-				phantomClick(MouseData.readPacket(buf));
-			} else if (id == 3) {
-				phantomScroll(MouseData.readPacket(buf));
-			}
+			if (id == SET_SUBSTITUTION) readSelection(buf, true);
+			else if (id == 2) phantomClick(MouseData.readPacket(buf));
+			else if (id == 3) phantomScroll(MouseData.readPacket(buf));
+		}
+
+		private void readSelection(PacketBuffer buf, boolean respond) throws IOException {
+			int requested = buf.readVarInt();
+			net.minecraft.nbt.NBTTagCompound tag = buf.readCompoundTag();
+			if (tag == null) return;
+			ItemStack identity = new ItemStack(tag);
+			List<ItemStack> candidates = storage.getCandidates(name);
+			if (requested < 0 || requested >= candidates.size()) return;
+			if (!sameItem(identity, candidates.get(requested))) return;
+			if (respond) setSubstitution(requested);
+			else storage.setOption(name, requested);
 		}
 
 		public boolean setSubstitution(int option) {
-			if (storage != null && getOption() != option) {
-				storage.setOption(name, option);
-				sync(SET_SUBSTITUTION, buf -> buf.writeVarInt(option));
-				return true;
+			List<ItemStack> candidates = storage.getCandidates(name);
+			if (option < 0 || option >= candidates.size()) return false;
+			if (getOption() == option) return false;
+			storage.setOption(name, option);
+			ItemStack identity = candidates.get(option);
+			sync(SET_SUBSTITUTION, buf -> {
+				buf.writeVarInt(option);
+				buf.writeCompoundTag(identity.serializeNBT());
+			});
+			return true;
+		}
+
+		private boolean setSubstitutionItem(ItemStack identity) {
+			List<ItemStack> candidates = storage.getCandidates(name);
+			for (int i = 0; i < candidates.size(); ++i) {
+				if (sameItem(identity, candidates.get(i))) return setSubstitution(i);
 			}
 			return false;
 		}
 
+		private boolean sameItem(ItemStack first, ItemStack second) {
+			return first != null && second != null && first.serializeNBT().equals(second.serializeNBT());
+		}
+
 		protected int getNextOption(int value) {
-			return MathHelper.clamp(getOption() + value, 0, options - 1);
+			int size = storage.getCandidates(name).size();
+			return size == 0 ? 0 : (int) Math.max(0L, Math.min(size - 1L, (long) getOption() + value));
 		}
 
 		protected void phantomClick(MouseData mouseData) {
@@ -189,7 +216,9 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 		}
 
 		protected int getOption() {
-			return storage.getOption(name);
+			int size = storage.getCandidates(name).size();
+			int option = storage.getOption(name);
+			return size == 0 ? 0 : MathHelper.clamp(option, 0, size - 1);
 		}
 	}
 }
