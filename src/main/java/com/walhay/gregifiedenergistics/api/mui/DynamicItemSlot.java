@@ -84,6 +84,11 @@ public class DynamicItemSlot extends ModularSlot {
 			if (count > Integer.MAX_VALUE) return;
 			displayed = ItemHandlerHelper.copyStackWithSize(actual, (int) count);
 		}
-		super.putStack(displayed);
+		// ModularSlot compares with the capped getStack() view. Compare against the
+		// actual contents instead, or an actual remainder of 64 can skip the debit.
+		if (ItemStack.areItemStacksEqual(actual, displayed)) return;
+		modifiable.setStackInSlot(handlerIndex, displayed.copy());
+		onSlotChanged();
+		if (isInitialized()) getSyncHandler().checkUpdate();
 	}
 }
