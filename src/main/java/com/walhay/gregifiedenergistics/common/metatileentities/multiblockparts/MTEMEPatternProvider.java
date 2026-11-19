@@ -47,6 +47,7 @@ import gregtech.api.util.GTTransferUtils;
 import gregtech.client.renderer.texture.cube.SimpleOverlayRenderer;
 import gregtech.common.metatileentities.multi.multiblockpart.MetaTileEntityItemBus;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -82,9 +83,11 @@ public class MTEMEPatternProvider extends MetaTileEntityCraftingProvider<IAEItem
 
 	@Override
 	public void setWorkingEnabled(boolean workingEnabled) {
+		if (this.workingEnabled == workingEnabled) return;
 		this.workingEnabled = workingEnabled;
 		var world = getWorld();
 		if (world != null && !world.isRemote) {
+			markDirty();
 			writeCustomData(GregtechDataCodes.WORKING_ENABLED, buf -> buf.writeBoolean(workingEnabled));
 		}
 		notifyPatternChange();
@@ -163,7 +166,13 @@ public class MTEMEPatternProvider extends MetaTileEntityCraftingProvider<IAEItem
 	@Override
 	protected void initializeInventory() {
 		super.initializeInventory();
-		this.circuitInventory = new GhostCircuitItemStackHandler(this);
+		this.circuitInventory = new GhostCircuitItemStackHandler(this) {
+			@Override
+			public void setCircuitValue(int config) {
+				super.setCircuitValue(config);
+				if (getWorld() != null && !getWorld().isRemote) markDirty();
+			}
+		};
 		this.circuitInventory.addNotifiableMetaTileEntity(this);
 		this.actualImportItems = new ItemHandlerList(Arrays.asList(importItems, circuitInventory));
 	}
@@ -225,6 +234,12 @@ public class MTEMEPatternProvider extends MetaTileEntityCraftingProvider<IAEItem
 		super.receiveInitialSyncData(buf);
 		this.workingEnabled = buf.readBoolean();
 		this.autoCollapse = buf.readBoolean();
+		try {
+			NBTTagCompound patterns = buf.readCompoundTag();
+			if (patterns != null) patternHandler.deserializeNBT(patterns);
+		} catch (IOException exception) {
+			throw new IllegalArgumentException("Invalid initial pattern-provider inventory", exception);
+		}
 	}
 
 	@Override
@@ -284,8 +299,8 @@ public class MTEMEPatternProvider extends MetaTileEntityCraftingProvider<IAEItem
 
 		Icon detail = GTGuiTextures.BUTTON_POWER_DETAIL.asIcon().size(18, 6).marginTop(24);
 
-		BooleanSyncValue workingStateValue = new BooleanSyncValue(() -> workingEnabled, val -> workingEnabled = val);
-		BooleanSyncValue collapseStateValue = new BooleanSyncValue(() -> autoCollapse, val -> autoCollapse = val);
+		BooleanSyncValue workingStateValue = new BooleanSyncValue(this::isWorkingEnabled, this::setWorkingEnabled);
+		BooleanSyncValue collapseStateValue = new BooleanSyncValue(this::isAutoCollapse, this::setAutoCollapse);
 
 		return GTGuis.createPanel(this, backgroundWidth, backgroundHeight)
 				.child(IKey.lang(getMetaFullName()).asWidget().pos(5, 5))
@@ -411,8 +426,9 @@ public class MTEMEPatternProvider extends MetaTileEntityCraftingProvider<IAEItem
 	}
 
 	public void setAutoCollapse(boolean inverted) {
+		if (autoCollapse == inverted) return;
 		autoCollapse = inverted;
-		if (!getWorld().isRemote) {
+		if (getWorld() != null && !getWorld().isRemote) {
 			if (autoCollapse) {
 				addNotifiedInput(super.getImportItems());
 			}

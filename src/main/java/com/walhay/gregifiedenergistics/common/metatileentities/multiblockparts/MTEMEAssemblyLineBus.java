@@ -9,8 +9,10 @@ import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.cleanroommc.modularui.value.sync.SyncHandlers;
 import com.cleanroommc.modularui.widget.Widget;
+import com.cleanroommc.modularui.widgets.ListWidget;
 import com.cleanroommc.modularui.widgets.SlotGroupWidget;
 import com.cleanroommc.modularui.widgets.layout.Flow;
+import com.cleanroommc.modularui.widgets.layout.Grid;
 import com.cleanroommc.modularui.widgets.slot.ItemSlot;
 import com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig;
 import com.walhay.gregifiedenergistics.api.capability.AbstractPatternItemHandler;
@@ -36,8 +38,8 @@ public class MTEMEAssemblyLineBus extends MTEAbstractAssemblyLineBus {
 
 	public static final String PATTERN_INVENTORY_TAG = "PatternInventory";
 
-	private final DataStickHandler patternHandler =
-			new DataStickHandler(GregifiedEnergisticsConfig.machineConfig.patternHandlerSize);
+	private final DataStickHandler patternHandler = new DataStickHandler(
+			Math.max(1, Math.min(4096, GregifiedEnergisticsConfig.machineConfig.patternHandlerSize)));
 
 	public MTEMEAssemblyLineBus(ResourceLocation metaTileEntityId) {
 		super(metaTileEntityId, LuV);
@@ -60,34 +62,37 @@ public class MTEMEAssemblyLineBus extends MTEAbstractAssemblyLineBus {
 	@SuppressWarnings("UnstableApiUsage")
 	public Widget<?> createPatternList(ModularPanel panel, PanelSyncManager syncHandler) {
 		panel.child(SlotGroupWidget.playerInventory(false).left(7).bottom(7));
-		syncHandler.registerSlotGroup("item_inv", 4);
-
+		int configured = GregifiedEnergisticsConfig.guiConfig.patternSlotsPerLine;
+		int columns = Math.min(patternHandler.getSlots(), configured <= 0 ? 9 : Math.max(1, Math.min(16, configured)));
+		syncHandler.registerSlotGroup("item_inv", columns);
 		return Flow.column()
 				.name("pattern list")
-				.widthRel(0.9f)
+				.widthRel(1f)
 				.horizontalCenter()
 				.coverChildrenHeight()
 				.child(IKey.lang("gregifiedenergistics.gui.pattern_list").asWidget())
-				.child(SlotGroupWidget.builder()
-						.slotGroup("item_inv")
-						.row("IIII")
-						.row("IIII")
-						.row("IIII")
-						.row("IIII")
-						.key(
-								'I',
-								index -> new ItemSlot()
-										.slot(SyncHandlers.itemSlot(patternHandler, index)
-												.changeListener((newItem, onlyAmountChanged, client, init) ->
-														patternHandler.onContentsChanged(index)))
-										.background(
-												GTGuiTextures.SLOT,
-												GregifiedEnergisticsGuiTextures.PATTERN_OVERLAY
-														.asIcon()
-														.size(16)))
-						.build()
-						.coverChildren()
-						.horizontalCenter());
+				.child(new ListWidget<>()
+						.widthRel(1f)
+						.height(78)
+						.child(new Grid()
+								.minElementMargin(0)
+								.minColWidth(18)
+								.minRowHeight(18)
+								.coverChildren()
+								.horizontalCenter()
+								.mapTo(
+										columns,
+										patternHandler.getSlots(),
+										index -> new ItemSlot()
+												.slot(SyncHandlers.itemSlot(patternHandler, index)
+														.slotGroup("item_inv")
+														.changeListener((newItem, onlyAmountChanged, client, init) ->
+																patternHandler.onContentsChanged(index)))
+												.background(
+														GTGuiTextures.SLOT,
+														GregifiedEnergisticsGuiTextures.PATTERN_OVERLAY
+																.asIcon()
+																.size(16)))));
 	}
 
 	@Override

@@ -37,11 +37,14 @@ import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.layout.Grid;
 import com.cleanroommc.modularui.widgets.slot.ItemSlot;
 import com.google.common.collect.Lists;
+import com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig;
+import com.walhay.gregifiedenergistics.api.capability.InfiniteItemStackHandler;
 import com.walhay.gregifiedenergistics.api.metatileentity.MetaTileEntityCraftingProvider;
 import com.walhay.gregifiedenergistics.api.patterns.AbstractPatternHelper;
 import com.walhay.gregifiedenergistics.api.patterns.ISubstitutionNotifiable;
 import com.walhay.gregifiedenergistics.api.patterns.ISubstitutionStorage;
 import com.walhay.gregifiedenergistics.api.patterns.substitutions.SubstitutionStorage;
+import com.walhay.gregifiedenergistics.api.util.AssemblyLineFluidTransfer;
 import com.walhay.gregifiedenergistics.api.util.BlockingMode;
 import com.walhay.gregifiedenergistics.client.render.GregifiedEnergisticsTextures;
 import com.walhay.gregifiedenergistics.common.mui.SubstitutionSlotWidget;
@@ -53,6 +56,7 @@ import gregtech.api.capability.impl.NotifiableItemStackHandler;
 import gregtech.api.metatileentity.multiblock.AbilityInstances;
 import gregtech.api.metatileentity.multiblock.IMultiblockAbilityPart;
 import gregtech.api.metatileentity.multiblock.MultiblockAbility;
+import gregtech.api.metatileentity.multiblock.MultiblockControllerBase;
 import gregtech.api.metatileentity.multiblock.RecipeMapMultiblockController;
 import gregtech.api.mui.GTGuiTextures;
 import gregtech.api.mui.GTGuis;
@@ -74,7 +78,7 @@ import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraft.world.World;
 import net.minecraftforge.common.capabilities.Capability;
@@ -92,9 +96,12 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 	public static final String FLUID_TO_SEND_TAG = "FluidToSend";
 	public static final String ITEM_TO_SEND_TAG = "ItemToSend";
 	public static final String SEND_SLOT_TAG = "Slot";
+	private static final String OWNED_FLUID_TAG = "ExtractedFluids";
 
-	private Int2ObjectOpenHashMap<ItemStack> waitingToSend;
-	private Int2ObjectOpenHashMap<FluidStack> fluidWaitingToSend;
+	private final Int2ObjectOpenHashMap<ItemStack> waitingToSend = new Int2ObjectOpenHashMap<>();
+	// Requests still belong to ME. Only extractedFluids have been removed from ME storage.
+	private final Int2ObjectOpenHashMap<FluidStack> fluidWaitingToSend = new Int2ObjectOpenHashMap<>();
+	private final Int2ObjectOpenHashMap<FluidStack> extractedFluids = new Int2ObjectOpenHashMap<>();
 	private BlockingMode blockingMode = BlockingMode.NO_BLOCKING;
 	private boolean useFluids = true;
 	private boolean workingEnabled = true;
@@ -113,7 +120,7 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 		super.update();
 		if (getWorld().isRemote) return;
 
-		if (isWorkingEnabled() && getOffsetTimer() % 5 == 0) {
+		if (isWorkingEnabled() && isAttachedToMultiBlock() && getOffsetTimer() % 5 == 0) {
 			if (hasItemsToSend()) pushItemsOut();
 
 			if (hasFluidsToSend()) pushFluidsOut();
@@ -126,13 +133,39 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 	}
 
 	@Override
-	public void clearMachineInventory(@NotNull List<@NotNull ItemStack> itemBuffer) {
-		super.clearMachineInventory(itemBuffer);
-		clearInventory(itemBuffer, importItems);
-		if (hasItemsToSend()) {
-			itemBuffer.addAll(waitingToSend.values());
+	public void writeItemStackData(NBTTagCompound data) {
+		super.writeItemStackData(data);
+		// Keep queue state unchanged during break: drops may be fetched before or after clearMachineInventory.
+		// Ordinary importItems still drop normally; queued items and extracted fluids exist only in this snapshot.
+		writeQueueData(data);
+	}
 
-			waitingToSend = null;
+	@Override
+	public void initFromItemStackData(NBTTagCompound data) {
+		super.initFromItemStackData(data);
+		if (data != null) readQueueData(data);
+	}
+
+	@Override
+	public void addToMultiBlock(MultiblockControllerBase controller) {
+		super.addToMultiBlock(controller);
+		notifyPatternChange();
+	}
+
+	@Override
+	public void removeFromMultiBlock(MultiblockControllerBase controller) {
+		super.removeFromMultiBlock(controller);
+		notifyPatternChange();
+	}
+
+	@Override
+	public void addInformation(ItemStack stack, World world, @NotNull List<String> tooltip, boolean advanced) {
+		super.addInformation(stack, world, tooltip, advanced);
+		if (stack.hasTagCompound()
+				&& (stack.getTagCompound().hasKey(ITEM_TO_SEND_TAG)
+						|| stack.getTagCompound().hasKey(FLUID_TO_SEND_TAG)
+						|| stack.getTagCompound().hasKey(OWNED_FLUID_TAG))) {
+			tooltip.add(I18n.format("gregifiedenergistics.machine.me_assembly_line_bus.retains_queue"));
 		}
 	}
 
@@ -145,7 +178,13 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 	@Override
 	public ModularPanel buildUI(PosGuiData guiData, PanelSyncManager sync, UISettings settings) {
 
-		ModularPanel panel = GTGuis.createPanel(this, 199, 200);
+		int patternColumns = GregifiedEnergisticsConfig.guiConfig.patternSlotsPerLine;
+		if (patternColumns <= 0) patternColumns = 9;
+		int columns = Math.max(
+				Math.min(16, patternColumns),
+				Math.max(1, Math.min(16, GregifiedEnergisticsConfig.guiConfig.substitutionSlotsPerLine)));
+		ModularPanel panel =
+				GTGuis.createPanel(this, Math.max(199, (int) Math.ceil((columns * 18 + 10) / 0.9) + 14), 200);
 
 		var controller = new PagedWidget.Controller();
 
@@ -271,17 +310,25 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 	public Widget<?> createSubstitutionList(ModularPanel panel, PanelSyncManager syncHandler) {
 		return Flow.column()
 				.left(7)
-				.widthRel(0.9f)
+				.widthRel(1f)
 				.child(IKey.lang("gregifiedenergistics.gui.substitution_list").asWidget())
 				.child(new ListWidget<>()
-						.widthRel(0.9f)
+						.widthRel(1f)
+						.height(160)
 						.child(new Grid()
 								.minElementMargin(0)
 								.minColWidth(18)
 								.minRowHeight(18)
 								.coverChildren()
-								.mapTo(9, Lists.newArrayList(substitutionStorage.getOptions()), (index, name) ->
-										(Widget<?>) new SubstitutionSlotWidget().storage(substitutionStorage, name))));
+								.mapTo(
+										Math.max(
+												1,
+												Math.min(
+														16,
+														GregifiedEnergisticsConfig.guiConfig.substitutionSlotsPerLine)),
+										Lists.newArrayList(substitutionStorage.getOptions()),
+										(index, name) -> (Widget<?>)
+												new SubstitutionSlotWidget().storage(substitutionStorage, name))));
 	}
 
 	@Override
@@ -294,26 +341,22 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 	public boolean onRightClick(
 			EntityPlayer player, EnumHand hand, EnumFacing facing, CuboidRayTraceResult traceResult) {
 		ItemStack heldItem = player.getHeldItem(hand);
-
 		if (AEApi.instance().definitions().items().memoryCard().isSameAs(heldItem)) {
+			if (getWorld() == null || getWorld().isRemote) return true;
 			if (player.isSneaking()) {
-				var nbt = new NBTTagCompound();
-				heldItem.writeToNBT(nbt);
-
-				nbt.setTag(STORAGE_TAG, substitutionStorage.serializeNBT());
-
-				heldItem.setTagCompound(nbt);
+				NBTTagCompound data = cleanMemoryCardTag(heldItem);
+				data.setTag(STORAGE_TAG, substitutionStorage.serializeNBT());
+				heldItem.setTagCompound(data);
 				player.sendStatusMessage(
-						new TextComponentString(I18n.format("gregifiedenergistics.machine.me.copy_settings")), true);
+						new TextComponentTranslation("gregifiedenergistics.machine.me.copy_settings"), true);
 			} else {
-				var tag = heldItem.getSubCompound(STORAGE_TAG);
-				if (tag != null) {
-					substitutionStorage.deserializeNBT(tag);
-
+				NBTTagCompound data = cleanMemoryCardTag(heldItem);
+				if (data.hasKey(STORAGE_TAG, NBT.TAG_COMPOUND)) {
+					substitutionStorage.deserializeNBT(data.getCompoundTag(STORAGE_TAG));
 					notifySubstitutionChange();
+					markDirty();
 					player.sendStatusMessage(
-							new TextComponentString(I18n.format("gregifiedenergistics.machine.me.paste_settings")),
-							true);
+							new TextComponentTranslation("gregifiedenergistics.machine.me.paste_settings"), true);
 				}
 			}
 			return true;
@@ -321,73 +364,98 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 		return super.onRightClick(player, hand, facing, traceResult);
 	}
 
+	private static NBTTagCompound cleanMemoryCardTag(ItemStack item) {
+		NBTTagCompound data = item.hasTagCompound() ? item.getTagCompound().copy() : new NBTTagCompound();
+		// Flatten only the exact full-item wrappers produced by previous releases; preserve unrelated item tags.
+		String itemId = item.getItem().getRegistryName().toString();
+		while (data.getString("id").equals(itemId)
+				&& data.hasKey("Count", NBT.TAG_BYTE)
+				&& data.hasKey("Damage", NBT.TAG_SHORT)) {
+			NBTTagCompound nested = data.getCompoundTag("tag").copy();
+			for (String key : data.getKeySet()) {
+				if (!key.equals("id") && !key.equals("Count") && !key.equals("Damage") && !key.equals("tag")) {
+					nested.setTag(key, data.getTag(key).copy());
+				}
+			}
+			data = nested;
+		}
+		return data;
+	}
+
 	@Override
 	public NBTTagCompound writeToNBT(NBTTagCompound data) {
 		super.writeToNBT(data);
 		data.setBoolean(WORKING_ENABLED_TAG, workingEnabled);
-		data.setString(BLOCKING_MODE_TAG, blockingMode.toString());
+		data.setString(BLOCKING_MODE_TAG, blockingMode.name());
 		data.setBoolean(USE_FLUID_TAG, useFluids);
-
-		if (hasItemsToSend()) {
-			NBTTagList itemList = new NBTTagList();
-			for (var entry : waitingToSend.entrySet()) {
-				NBTTagCompound tag = new NBTTagCompound();
-
-				entry.getValue().writeToNBT(tag);
-				tag.setInteger(SEND_SLOT_TAG, entry.getKey());
-
-				itemList.appendTag(tag);
-			}
-			data.setTag(ITEM_TO_SEND_TAG, itemList);
-		}
-
-		if (hasFluidsToSend()) {
-			NBTTagList fluidList = new NBTTagList();
-			for (var entry : fluidWaitingToSend.entrySet()) {
-				NBTTagCompound tag = new NBTTagCompound();
-
-				entry.getValue().writeToNBT(tag);
-				tag.setInteger(SEND_SLOT_TAG, entry.getKey());
-
-				fluidList.appendTag(tag);
-			}
-			data.setTag(FLUID_TO_SEND_TAG, fluidList);
-		}
-
+		writeQueueData(data);
 		return data;
+	}
+
+	private void writeQueueData(NBTTagCompound data) {
+		NBTTagList items = new NBTTagList();
+		for (var entry : waitingToSend.entrySet()) {
+			NBTTagCompound item = InfiniteItemStackHandler.writeStack(entry.getValue());
+			item.setInteger(SEND_SLOT_TAG, entry.getKey());
+			items.appendTag(item);
+		}
+		if (items.isEmpty()) data.removeTag(ITEM_TO_SEND_TAG);
+		else data.setTag(ITEM_TO_SEND_TAG, items);
+		if (fluidWaitingToSend.isEmpty()) data.removeTag(FLUID_TO_SEND_TAG);
+		else data.setTag(FLUID_TO_SEND_TAG, writeFluidQueue(fluidWaitingToSend));
+		if (extractedFluids.isEmpty()) data.removeTag(OWNED_FLUID_TAG);
+		else data.setTag(OWNED_FLUID_TAG, writeFluidQueue(extractedFluids));
+	}
+
+	private static NBTTagList writeFluidQueue(Int2ObjectOpenHashMap<FluidStack> queue) {
+		NBTTagList entries = new NBTTagList();
+		for (var entry : queue.entrySet()) {
+			if (entry.getValue() == null || entry.getValue().amount <= 0) continue;
+			NBTTagCompound fluid = entry.getValue().writeToNBT(new NBTTagCompound());
+			fluid.setInteger(SEND_SLOT_TAG, entry.getKey());
+			entries.appendTag(fluid);
+		}
+		return entries;
+	}
+
+	private static void readFluidQueue(NBTTagList entries, Int2ObjectOpenHashMap<FluidStack> queue) {
+		queue.clear();
+		for (int i = 0; i < entries.tagCount(); ++i) {
+			NBTTagCompound entry = entries.getCompoundTagAt(i);
+			int slot = entry.getInteger(SEND_SLOT_TAG);
+			FluidStack fluid = FluidStack.loadFluidStackFromNBT(entry);
+			if (slot >= 0 && slot < 4096 && fluid != null && fluid.amount > 0) queue.put(slot, fluid);
+		}
 	}
 
 	@Override
 	public void readFromNBT(NBTTagCompound data) {
 		super.readFromNBT(data);
-		workingEnabled = data.getBoolean(WORKING_ENABLED_TAG);
-		blockingMode = BlockingMode.valueOf(data.getString(BLOCKING_MODE_TAG));
-		useFluids = data.getBoolean(USE_FLUID_TAG);
-
-		if (data.hasKey(ITEM_TO_SEND_TAG)) {
-			NBTTagList itemList = data.getTagList(ITEM_TO_SEND_TAG, NBT.TAG_COMPOUND);
-
-			for (int i = 0; i < itemList.tagCount(); ++i) {
-				NBTTagCompound tag = itemList.getCompoundTagAt(i);
-
-				int slot = tag.getInteger(SEND_SLOT_TAG);
-				ItemStack stack = new ItemStack(tag);
-
-				waitingToSend.put(slot, stack);
-			}
+		workingEnabled = !data.hasKey(WORKING_ENABLED_TAG) || data.getBoolean(WORKING_ENABLED_TAG);
+		blockingMode = BlockingMode.NO_BLOCKING;
+		try {
+			blockingMode = BlockingMode.valueOf(data.getString(BLOCKING_MODE_TAG));
+		} catch (IllegalArgumentException ignored) {
+			// Missing/obsolete mode names retain the default.
 		}
+		useFluids = !data.hasKey(USE_FLUID_TAG) || data.getBoolean(USE_FLUID_TAG);
+		readQueueData(data);
+	}
 
-		if (data.hasKey(FLUID_TO_SEND_TAG)) {
-			NBTTagList fluidList = data.getTagList(FLUID_TO_SEND_TAG, NBT.TAG_COMPOUND);
-
-			for (int i = 0; i < fluidList.tagCount(); ++i) {
-				NBTTagCompound tag = fluidList.getCompoundTagAt(i);
-
-				int slot = tag.getInteger(SEND_SLOT_TAG);
-				FluidStack stack = FluidStack.loadFluidStackFromNBT(tag);
-
-				fluidWaitingToSend.put(slot, stack);
-			}
+	private void readQueueData(NBTTagCompound data) {
+		waitingToSend.clear();
+		NBTTagList entries = data.getTagList(ITEM_TO_SEND_TAG, NBT.TAG_COMPOUND);
+		for (int i = 0; i < entries.tagCount(); ++i) {
+			NBTTagCompound entry = entries.getCompoundTagAt(i);
+			int slot = entry.getInteger(SEND_SLOT_TAG);
+			ItemStack stack = InfiniteItemStackHandler.readStack(entry);
+			if (slot >= 0 && slot < 4096 && !stack.isEmpty()) waitingToSend.put(slot, stack);
+		}
+		readFluidQueue(data.getTagList(FLUID_TO_SEND_TAG, NBT.TAG_COMPOUND), fluidWaitingToSend);
+		readFluidQueue(data.getTagList(OWNED_FLUID_TAG, NBT.TAG_COMPOUND), extractedFluids);
+		for (var entry : extractedFluids.entrySet()) {
+			if (!fluidWaitingToSend.containsKey(entry.getKey()))
+				fluidWaitingToSend.put(entry.getKey(), entry.getValue().copy());
 		}
 	}
 
@@ -467,7 +535,7 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 	// check if hatch can be used for pushing pattern right now
 	@Override
 	public boolean isBusy() {
-		if (!isAttachedToMultiBlock() || hasItemsToSend() || hasFluidsToSend()) {
+		if (!isWorkingEnabled() || !isAttachedToMultiBlock() || hasItemsToSend() || hasFluidsToSend()) {
 			return true;
 		}
 
@@ -492,8 +560,12 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 	// try to push pattern to import buses
 	@Override
 	public boolean pushPattern(ICraftingPatternDetails pattern, InventoryCrafting inventoryCrafting) {
-		if (hasItemsToSend()
-				|| (useFluids && hasFluidsToSend())
+		if (!isWorkingEnabled()
+				|| !isAttachedToMultiBlock()
+				|| getWorld() == null
+				|| getWorld().isRemote
+				|| hasItemsToSend()
+				|| hasFluidsToSend()
 				|| getProxy() == null
 				|| !getProxy().isActive()) {
 			return false;
@@ -509,21 +581,22 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 			for (int i = 0; i < inventoryCrafting.getSizeInventory(); ++i) {
 				ItemStack stack = inventoryCrafting.getStackInSlot(i);
 				if (!stack.isEmpty()) {
-					addToSendList(slot++, stack);
+					addToSendList(slot++, stack.copy());
 				}
 			}
 
 			if (useFluids && fluids != null) {
 				slot = 0;
 				for (IAEFluidStack fluidStack : fluids) {
+					if (fluidStack == null) continue;
 					FluidStack stack = fluidStack.getFluidStack();
 					if (stack != null && stack.amount != 0) {
-						addToSendList(slot++, stack);
+						addToSendList(slot++, stack.copy());
 					}
 				}
-				pushFluidsOut();
+				if (hasFluidsToSend()) pushFluidsOut();
 			}
-			pushItemsOut();
+			if (hasItemsToSend()) pushItemsOut();
 			return true;
 		}
 
@@ -556,75 +629,48 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 		return true;
 	}
 
-	private boolean containsFluids(IAEFluidStack[] fluids) {
-		if (getProxy() == null) return false;
-
-		for (IAEFluidStack fluidStack : fluids) {
-			try {
-				IAEFluidStack find = getProxy()
-						.getStorage()
-						.getInventory(getStorageChannel())
-						.getStorageList()
-						.findPrecise(fluidStack);
-				if (find == null || find.getStackSize() < fluidStack.getStackSize()) {
-					return false;
-				}
-			} catch (GridAccessException e) {
-				return false;
-			}
-		}
-		return true;
-	}
-
 	private boolean acceptsFluids(IAEFluidStack[] inputs) {
-		if (inputs == null || inputs.length == 0) {
-			return true;
+		if (inputs == null || inputs.length == 0) return true;
+		if (getProxy() == null || !isAttachedToMultiBlock()) return false;
+		List<IFluidTank> tanks = getController().getAbilities(MultiblockAbility.IMPORT_FLUIDS);
+		List<IAEFluidStack> cumulative = new java.util.ArrayList<>();
+		int slot = 0;
+		for (IAEFluidStack input : inputs) {
+			if (input == null || input.getStackSize() <= 0) continue;
+			if (input.getStackSize() > Integer.MAX_VALUE || slot >= tanks.size()) return false;
+			FluidStack fluid = input.getFluidStack();
+			if (fluid == null || tanks.get(slot++).fill(fluid.copy(), false) < input.getStackSize()) return false;
+			IAEFluidStack total = null;
+			for (IAEFluidStack existing : cumulative)
+				if (existing.getFluidStack().isFluidEqual(fluid)) {
+					total = existing;
+					break;
+				}
+			if (total == null) cumulative.add(input.copy());
+			else total.setStackSize(total.getStackSize() + input.getStackSize());
 		}
-
-		if (getProxy() == null || !containsFluids(inputs)) {
+		try {
+			var inventory = getProxy().getStorage().getInventory(getStorageChannel());
+			for (IAEFluidStack total : cumulative) {
+				IAEFluidStack available = inventory.extractItems(total, Actionable.SIMULATE, getActionSource());
+				if (available == null || available.getStackSize() < total.getStackSize()) return false;
+			}
+			return true;
+		} catch (GridAccessException ignored) {
 			return false;
 		}
-
-		List<IFluidTank> inputHandlers = getController().getAbilities(MultiblockAbility.IMPORT_FLUIDS);
-
-		Iterator<IFluidTank> it = inputHandlers.iterator();
-
-		for (IAEFluidStack fluidStack : inputs) {
-			if (fluidStack == null || fluidStack.getStackSize() == 0) {
-				continue;
-			}
-
-			if (!it.hasNext()) {
-				return false;
-			}
-
-			if (it.next().fill(fluidStack.getFluidStack(), false) < fluidStack.getStackSize()) {
-				return false;
-			}
-
-			try {
-				IAEFluidStack result = getProxy()
-						.getStorage()
-						.getInventory(getStorageChannel())
-						.extractItems(fluidStack, Actionable.SIMULATE, getActionSource());
-				if (!result.equals(fluidStack)) {
-					return false;
-				}
-			} catch (GridAccessException e) {
-				return false;
-			}
-		}
-		return true;
 	}
 
 	// Push items from auto-crafting to input buses
 	private void pushItemsOut() {
+		if (!hasItemsToSend() || !isAttachedToMultiBlock()) return;
 		List<InventoryAdaptor> inventoryAdaptors = getController().getAbilities(MultiblockAbility.IMPORT_ITEMS).stream()
 				.filter(i -> !(i instanceof GhostCircuitItemStackHandler))
 				.map(AdaptorItemHandler::new)
 				.collect(Collectors.toList());
 
 		Iterator<Map.Entry<Integer, ItemStack>> it = waitingToSend.entrySet().iterator();
+		boolean changed = false;
 
 		while (it.hasNext()) {
 			Map.Entry<Integer, ItemStack> entry = it.next();
@@ -633,63 +679,64 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 			ItemStack stack = entry.getValue();
 
 			if (stack.isEmpty()) {
+				it.remove();
+				changed = true;
 				continue;
 			}
 
-			if (index <= inventoryAdaptors.size()) {
-				ItemStack result = inventoryAdaptors.get(index).addItems(stack);
+			if (index >= 0 && index < inventoryAdaptors.size()) {
+				ItemStack result = inventoryAdaptors.get(index).addItems(stack.copy());
 				if (result.isEmpty()) {
 					it.remove();
-				} else {
-					stack.setCount(result.getCount());
+					changed = true;
+				} else if (!ItemStack.areItemStacksEqual(stack, result)) {
+					entry.setValue(result.copy());
+					changed = true;
 				}
 			}
 		}
 
-		if (waitingToSend.isEmpty()) {
-			waitingToSend = null;
-		}
+		if (changed) markDirty();
 	}
 
 	private void pushFluidsOut() {
-		if (getProxy() == null) return;
-
-		List<IFluidTank> inputHandlers = getController().getAbilities(MultiblockAbility.IMPORT_FLUIDS);
-
-		Iterator<Map.Entry<Integer, FluidStack>> it =
+		if (!hasFluidsToSend() || !isAttachedToMultiBlock()) return;
+		List<IFluidTank> tanks = getController().getAbilities(MultiblockAbility.IMPORT_FLUIDS);
+		Iterator<Map.Entry<Integer, FluidStack>> iterator =
 				fluidWaitingToSend.entrySet().iterator();
-
-		while (it.hasNext()) {
-			Map.Entry<Integer, FluidStack> entry = it.next();
-
+		while (iterator.hasNext()) {
+			var entry = iterator.next();
 			int slot = entry.getKey();
-			FluidStack stack = entry.getValue();
-
-			if (stack == null || stack.amount == 0) {
+			FluidStack request = entry.getValue();
+			if (request == null || request.amount <= 0) {
+				if (!extractedFluids.containsKey(slot)) iterator.remove();
 				continue;
 			}
-
-			if (slot < inputHandlers.size()) {
-				try {
-					IAEFluidStack extracted = getProxy()
-							.getStorage()
-							.getInventory(getStorageChannel())
-							.extractItems(
-									getStorageChannel().createStack(stack), Actionable.MODULATE, getActionSource());
-					int filled = inputHandlers.get(slot).fill(extracted.getFluidStack(), true);
-					if (filled == stack.amount) {
-						it.remove();
-					} else {
-						stack.amount -= filled;
-					}
-				} catch (GridAccessException e) {
-					// :3
-				}
+			if (slot < 0 || slot >= tanks.size()) continue;
+			try {
+				FluidStack owned = extractedFluids.get(slot);
+				var network = owned != null || getProxy() == null
+						? null
+						: getProxy().getStorage().getInventory(getStorageChannel());
+				AssemblyLineFluidTransfer.Result result =
+						AssemblyLineFluidTransfer.transfer(tanks.get(slot), request, owned, offer -> {
+							if (network == null) return null;
+							IAEFluidStack extracted = network.extractItems(
+									getStorageChannel().createStack(offer), Actionable.MODULATE, getActionSource());
+							return extracted == null ? null : extracted.getFluidStack();
+						});
+				if (result.remainder == null) extractedFluids.remove(slot);
+				else extractedFluids.put(slot, result.remainder);
+				request.amount -= result.delivered;
+				if (request.amount <= 0 && result.remainder == null) iterator.remove();
+				if (result.delivered > 0
+						|| (owned == null
+								? result.remainder != null
+								: result.remainder == null || !owned.isFluidStackIdentical(result.remainder)))
+					markDirty();
+			} catch (GridAccessException ignored) {
+				// ME is unavailable. Keep both the outstanding request and all already extracted fluid.
 			}
-		}
-
-		if (fluidWaitingToSend.isEmpty()) {
-			fluidWaitingToSend = null;
 		}
 	}
 
@@ -711,29 +758,27 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 	public abstract Collection<? extends ICraftingPatternDetails> getPatterns();
 
 	private void addToSendList(int slot, ItemStack stack) {
-		if (waitingToSend == null) {
-			waitingToSend = new Int2ObjectOpenHashMap<>();
-		}
 		waitingToSend.put(slot, stack);
+		markDirty();
 	}
 
 	public boolean hasItemsToSend() {
-		return this.waitingToSend != null && !this.waitingToSend.isEmpty();
+		return !waitingToSend.isEmpty();
 	}
 
 	private void addToSendList(int slot, FluidStack stack) {
-		if (fluidWaitingToSend == null) {
-			fluidWaitingToSend = new Int2ObjectOpenHashMap<>();
-		}
 		fluidWaitingToSend.put(slot, stack);
+		markDirty();
 	}
 
 	public boolean hasFluidsToSend() {
-		return this.fluidWaitingToSend != null && !this.fluidWaitingToSend.isEmpty();
+		return !fluidWaitingToSend.isEmpty();
 	}
 
 	public void setBlockingMode(BlockingMode blockingMode) {
+		if (blockingMode == null || this.blockingMode == blockingMode) return;
 		this.blockingMode = blockingMode;
+		if (getWorld() != null && !getWorld().isRemote) markDirty();
 	}
 
 	public BlockingMode getBlockingMode() {
@@ -741,7 +786,9 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 	}
 
 	public void setUsingFluids(boolean useFluids) {
+		if (this.useFluids == useFluids) return;
 		this.useFluids = useFluids;
+		if (getWorld() != null && !getWorld().isRemote) markDirty();
 	}
 
 	public boolean getUsingFluids() {
@@ -750,9 +797,11 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 
 	@Override
 	public void setWorkingEnabled(boolean workingEnabled) {
+		if (this.workingEnabled == workingEnabled) return;
 		this.workingEnabled = workingEnabled;
 		World world = getWorld();
 		if (world != null && !world.isRemote) {
+			markDirty();
 			writeCustomData(GregtechDataCodes.WORKING_ENABLED, buf -> buf.writeBoolean(workingEnabled));
 			notifyPatternChange();
 		}

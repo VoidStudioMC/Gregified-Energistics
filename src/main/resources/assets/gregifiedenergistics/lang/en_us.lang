@@ -48,4 +48,5 @@ gregifiedenergistics.gui.buffer_empty=No pattern
 gregifiedenergistics.gui.buffer_count=Stored: %d items
 gregifiedenergistics.gui.buffer_pending=Waiting for remaining inputs to be returned or removed.
 gregifiedenergistics.machine.me_pattern_buffer.retains_inventory=Retains patterns, items and fluids when dismantled. Place it again to recover the contents.
+gregifiedenergistics.machine.me_assembly_line_bus.retains_queue=Retains pending inputs and extracted fluids when dismantled.
 gregifiedenergistics.gui.substitution_hint=Click or scroll to cycle; Shift-click to choose a substitution
