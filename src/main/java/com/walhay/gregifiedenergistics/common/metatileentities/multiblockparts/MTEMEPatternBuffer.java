@@ -702,15 +702,7 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 											"buffer_amount",
 											slotIndex,
 											IntSyncValue.class,
-											() -> new IntSyncValue(
-													() -> slotIndex
-																	< storage.items()
-																			.getSlots()
-															? storage.items()
-																	.getStackInSlot(slotIndex)
-																	.getCount()
-															: 0,
-													ignored -> {}));
+											() -> itemCountSync(slotIndex));
 									return new ItemSlot() {
 										@Override
 										public void buildTooltip(
@@ -761,6 +753,28 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 					.widthRel(1f)
 					.heightRel(1f)
 					.child(contents);
+		}
+
+		private IntSyncValue itemCountSync(int index) {
+			return new IntSyncValue(() -> index < storage.items().getSlots()
+					? storage.items().getStackInSlot(index).getCount()
+					: 0) {
+				private boolean initialSync = true;
+
+				@Override
+				public void init(String key, PanelSyncManager manager) {
+					super.init(key, manager);
+					initialSync = true;
+				}
+
+				@Override
+				public void detectAndSendChanges(boolean init) {
+					// Dynamic handlers are registered after the panel's first sync.
+					// Send the initial amount even when the constructor cache is current.
+					super.detectAndSendChanges(init || initialSync);
+					initialSync = false;
+				}
+			};
 		}
 
 		private IFluidTank liveTank(int index) {
