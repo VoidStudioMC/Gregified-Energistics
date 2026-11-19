@@ -185,6 +185,8 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 				Math.max(1, Math.min(16, GregifiedEnergisticsConfig.guiConfig.substitutionSlotsPerLine)));
 		ModularPanel panel = GTGuis.createPanel(
 				this, Math.min(300, Math.max(199, (int) Math.ceil((columns * 18 + 10) / 0.9) + 14)), 200);
+		// Include the 32-pixel tabs above the panel when centring the complete GUI.
+		panel.topRel(0.5f, 16, 0.5f);
 
 		var controller = new PagedWidget.Controller();
 
