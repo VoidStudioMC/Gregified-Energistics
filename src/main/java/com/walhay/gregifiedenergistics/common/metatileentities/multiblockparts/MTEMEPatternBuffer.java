@@ -711,11 +711,15 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 																	.getCount()
 															: 0,
 													ignored -> {}));
-									return new ItemSlot()
-											.syncHandler(itemSyncHandler)
-											.background(GTGuiTextures.SLOT)
-											.tooltipBuilder(t -> t.addLine(IKey.lang(
-													"gregifiedenergistics.gui.buffer_count", total.getIntValue())));
+									return new ItemSlot() {
+										@Override
+										public void buildTooltip(
+												ItemStack stack, com.cleanroommc.modularui.screen.RichTooltip tooltip) {
+											super.buildTooltip(stack, tooltip);
+											tooltip.addLine(IKey.lang(
+													"gregifiedenergistics.gui.buffer_count", total.getIntValue()));
+										}
+									}.syncHandler(itemSyncHandler).background(GTGuiTextures.SLOT);
 								})));
 			}
 
@@ -744,15 +748,19 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 				row.child(IKey.lang("gregifiedenergistics.gui.buffer_empty").asWidget());
 			}
 
+			Widget<?> contents = row.coverChildren();
 			if (waitingForRecovery) {
-				return Flow.column()
+				contents = Flow.column()
 						.coverChildren()
 						.child(IKey.lang("gregifiedenergistics.gui.buffer_pending")
 								.asWidget()
 								.width(180))
 						.child(row.coverChildren());
 			}
-			return row.coverChildren();
+			return new com.cleanroommc.modularui.widgets.ListWidget<>()
+					.widthRel(1f)
+					.heightRel(1f)
+					.child(contents);
 		}
 
 		private IFluidTank liveTank(int index) {
