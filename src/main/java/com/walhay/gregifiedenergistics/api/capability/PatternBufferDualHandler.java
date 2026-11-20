@@ -3,38 +3,22 @@ package com.walhay.gregifiedenergistics.api.capability;
 import gregtech.api.capability.DualHandler;
 import gregtech.api.capability.IMultipleTankHandler;
 import gregtech.api.capability.impl.GhostCircuitItemStackHandler;
-import gregtech.api.capability.impl.ItemHandlerList;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import net.minecraft.item.ItemStack;
 import net.minecraftforge.items.IItemHandlerModifiable;
 import org.jetbrains.annotations.NotNull;
 
 /** DualHandlerPattern */
 public class PatternBufferDualHandler extends DualHandler {
 
-	private final IItemHandlerModifiable itemInventory;
-	private final GhostCircuitItemStackHandler circuitInventory;
-
 	private List<IMultipleTankHandler.ITankEntry> tanks = Collections.emptyList();
-	private long fluidRevision;
-
-	@Override
-	public @NotNull ItemStack getStackInSlot(int slot) {
-		if (slot < 0 || slot >= getSlots()) return ItemStack.EMPTY;
-
-		return super.getStackInSlot(slot);
-	}
 
 	public PatternBufferDualHandler(
 			@NotNull IItemHandlerModifiable itemDelegate,
 			GhostCircuitItemStackHandler circuitInventory,
 			@NotNull IMultipleTankHandler fluidTank) {
-		super(new ItemHandlerList(Arrays.asList(itemDelegate, circuitInventory)), fluidTank, false);
-		this.itemInventory = itemDelegate;
-		this.circuitInventory = circuitInventory;
+		super(new SegmentItemHandlerList(itemDelegate, circuitInventory), fluidTank, false);
 		setFluidDelegate(fluidTank);
 	}
 
@@ -45,11 +29,6 @@ public class PatternBufferDualHandler extends DualHandler {
 			replacement.add(new DualEntry(this, entry));
 		}
 		this.tanks = Collections.unmodifiableList(replacement);
-		fluidRevision++;
-	}
-
-	public long getFluidRevision() {
-		return fluidRevision;
 	}
 
 	@Override
@@ -60,9 +39,5 @@ public class PatternBufferDualHandler extends DualHandler {
 	@Override
 	public @NotNull IMultipleTankHandler.ITankEntry getTankAt(int index) {
 		return tanks.get(index);
-	}
-
-	public void onResize() {
-		this.itemDelegate = new ItemHandlerList(Arrays.asList(itemInventory, circuitInventory));
 	}
 }

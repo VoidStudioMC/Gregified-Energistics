@@ -521,7 +521,6 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 		}
 
 		private void refreshDelegates() {
-			dualHandler.onResize();
 			dualHandler.setFluidDelegate(storage.fluids());
 			contentsChanged();
 		}
