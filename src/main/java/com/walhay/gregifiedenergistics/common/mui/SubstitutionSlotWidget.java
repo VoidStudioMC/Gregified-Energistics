@@ -27,9 +27,12 @@ import org.jetbrains.annotations.NotNull;
 
 public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> implements Interactable {
 
+	private static final int CLICK = 2;
+	private static final int SCROLL = 3;
+
 	private List<ItemStack> items = java.util.Collections.emptyList();
 	private ISubstitutionStorage storage;
-	private SubstituionSyncHandler syncHandler;
+	private SubstitutionSyncHandler syncHandler;
 	private String name;
 	private ItemDrawable itemPreview;
 
@@ -41,7 +44,7 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 		onUpdateListener(w -> {
 			if (storage == null || syncHandler == null) return;
 			items = storage.getCandidates(name);
-			itemPreview.setItem(items.isEmpty() ? ItemStack.EMPTY : items.get(syncHandler.getOption()));
+			itemPreview.setItem(items.isEmpty() ? ItemStack.EMPTY : items.get(syncHandler.getOption(items.size())));
 		});
 	}
 
@@ -50,7 +53,9 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 		this.storage = storage;
 		this.items = storage.getCandidates(name);
 		this.syncHandler = manager.getOrCreateSyncHandler(
-				"substitution:" + name, SubstituionSyncHandler.class, () -> new SubstituionSyncHandler(storage, name));
+				"substitution:" + name,
+				SubstitutionSyncHandler.class,
+				() -> new SubstitutionSyncHandler(storage, name));
 		setSyncOrValue(syncHandler);
 
 		return this;
@@ -60,18 +65,18 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 	public void onInit() {
 		tooltip().setAutoUpdate(true);
 		tooltip().tooltipBuilder(rt -> {
-			if (!items.isEmpty()) rt.addFromItem(items.get(syncHandler.getOption()));
+			if (!items.isEmpty()) rt.addFromItem(items.get(syncHandler.getOption(items.size())));
 			rt.addLine(IKey.lang("gregifiedenergistics.gui.substitution_hint"));
 		});
 	}
 
 	@Override
 	public boolean isValidSyncOrValue(@NotNull ISyncOrValue syncOrValue) {
-		return syncOrValue instanceof SubstituionSyncHandler;
+		return syncOrValue instanceof SubstitutionSyncHandler;
 	}
 
 	@Override
-	public SubstituionSyncHandler getSyncHandler() {
+	public SubstitutionSyncHandler getSyncHandler() {
 		return syncHandler;
 	}
 
@@ -146,7 +151,7 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 
 	private ItemStack selectedItem() {
 		List<ItemStack> candidates = storage.getCandidates(name);
-		return candidates.isEmpty() ? ItemStack.EMPTY : candidates.get(syncHandler.getOption());
+		return candidates.isEmpty() ? ItemStack.EMPTY : candidates.get(syncHandler.getOption(candidates.size()));
 	}
 
 	private static boolean sameCandidates(List<ItemStack> first, List<ItemStack> second) {
@@ -167,7 +172,7 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 			selectorPanel().togglePanel();
 		} else {
 			MouseData mouseData = MouseData.create(mouseButton);
-			syncHandler.syncToServer(2, mouseData::writeToPacket);
+			syncHandler.syncToServer(CLICK, mouseData::writeToPacket);
 		}
 		return Result.SUCCESS;
 	}
@@ -176,11 +181,11 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 	public boolean onMouseScroll(UpOrDown scrollDirection, int amount) {
 		if (getPanel() == null || !getPanel().isOpen() || items.isEmpty()) return false;
 		MouseData mouseData = MouseData.create(scrollDirection.modifier);
-		syncHandler.syncToServer(3, mouseData::writeToPacket);
+		syncHandler.syncToServer(SCROLL, mouseData::writeToPacket);
 		return true;
 	}
 
-	public static class SubstituionSyncHandler extends SyncHandler {
+	public static class SubstitutionSyncHandler extends SyncHandler {
 
 		// Stable across dynamic grid rebuilds; MUI identifies secondary panels by name.
 		private IPanelHandler selectorPanel;
@@ -189,7 +194,7 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 		private final String name;
 		public static final int SET_SUBSTITUTION = 0;
 
-		public SubstituionSyncHandler(ISubstitutionStorage storage, String name) {
+		public SubstitutionSyncHandler(ISubstitutionStorage storage, String name) {
 			this.storage = storage;
 			this.name = name;
 		}
@@ -202,8 +207,8 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 		@Override
 		public void readOnServer(int id, PacketBuffer buf) throws IOException {
 			if (id == SET_SUBSTITUTION) readSelection(buf, true);
-			else if (id == 2) phantomClick(MouseData.readPacket(buf));
-			else if (id == 3) phantomScroll(MouseData.readPacket(buf));
+			else if (id == CLICK) phantomClick(MouseData.readPacket(buf));
+			else if (id == SCROLL) phantomScroll(MouseData.readPacket(buf));
 		}
 
 		private void readSelection(PacketBuffer buf, boolean respond) throws IOException {
@@ -213,7 +218,7 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 			ItemStack identity = new ItemStack(tag);
 			List<ItemStack> candidates = storage.getCandidates(name);
 			if (requested < 0 || requested >= candidates.size()) return;
-			if (!sameItem(identity, candidates.get(requested))) return;
+			if (!ItemStack.areItemStacksEqual(identity, candidates.get(requested))) return;
 			if (respond) setSubstitution(requested);
 			else storage.setOption(name, requested);
 		}
@@ -221,7 +226,7 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 		public boolean setSubstitution(int option) {
 			List<ItemStack> candidates = storage.getCandidates(name);
 			if (option < 0 || option >= candidates.size()) return false;
-			if (getOption() == option) return false;
+			if (getOption(candidates.size()) == option) return false;
 			storage.setOption(name, option);
 			ItemStack identity = candidates.get(option);
 			sync(SET_SUBSTITUTION, buf -> {
@@ -234,18 +239,14 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 		private boolean setSubstitutionItem(ItemStack identity) {
 			List<ItemStack> candidates = storage.getCandidates(name);
 			for (int i = 0; i < candidates.size(); ++i) {
-				if (sameItem(identity, candidates.get(i))) return setSubstitution(i);
+				if (ItemStack.areItemStacksEqual(identity, candidates.get(i))) return setSubstitution(i);
 			}
 			return false;
 		}
 
-		private boolean sameItem(ItemStack first, ItemStack second) {
-			return first != null && second != null && first.serializeNBT().equals(second.serializeNBT());
-		}
-
 		protected int getNextOption(int value) {
 			int size = storage.getCandidates(name).size();
-			return size == 0 ? 0 : (int) Math.max(0L, Math.min(size - 1L, (long) getOption() + value));
+			return size == 0 ? 0 : (int) Math.max(0L, Math.min(size - 1L, (long) getOption(size) + value));
 		}
 
 		protected void phantomClick(MouseData mouseData) {
@@ -260,8 +261,7 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 			setSubstitution(getNextOption(mouseData.mouseButton));
 		}
 
-		protected int getOption() {
-			int size = storage.getCandidates(name).size();
+		protected int getOption(int size) {
 			int option = storage.getOption(name);
 			return size == 0 ? 0 : MathHelper.clamp(option, 0, size - 1);
 		}

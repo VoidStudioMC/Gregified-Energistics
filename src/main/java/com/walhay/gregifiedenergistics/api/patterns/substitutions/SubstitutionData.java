@@ -12,6 +12,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants.NBT;
+import net.minecraftforge.items.ItemHandlerHelper;
 
 /** Stores provider choices by item so candidate reordering preserves the selection. */
 public class SubstitutionData implements ISubstitutionStorage {
@@ -120,7 +121,8 @@ public class SubstitutionData implements ISubstitutionStorage {
 			if (choice != null && !choice.isEmpty()) tag.setTag("Selected", choice.serializeNBT());
 			if (includeCandidates) {
 				NBTTagList stacks = new NBTTagList();
-				for (ItemStack stack : getCandidates(name)) stacks.appendTag(stack.serializeNBT());
+				for (ItemStack stack : candidates.getOrDefault(name, Collections.emptyList()))
+					stacks.appendTag(stack.serializeNBT());
 				tag.setTag("Candidates", stacks);
 			}
 			list.appendTag(tag);
@@ -168,11 +170,7 @@ public class SubstitutionData implements ISubstitutionStorage {
 
 	private static boolean sameItem(ItemStack first, ItemStack second) {
 		if (first == null || second == null) return first == second;
-		ItemStack a = first.copy();
-		ItemStack b = second.copy();
-		a.setCount(1);
-		b.setCount(1);
-		return a.serializeNBT().equals(b.serializeNBT());
+		return first.isEmpty() ? second.isEmpty() : ItemHandlerHelper.canItemStacksStack(first, second);
 	}
 
 	private static boolean sameCandidates(List<ItemStack> first, List<ItemStack> second) {

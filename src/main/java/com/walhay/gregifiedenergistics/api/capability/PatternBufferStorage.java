@@ -11,7 +11,7 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants.NBT;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidTank;
-import net.minecraftforge.items.IItemHandler;
+import net.minecraftforge.items.ItemHandlerHelper;
 
 /** Owned buffer contents. Shape changes require an empty buffer; batch insertion commits only after full preflight. */
 public final class PatternBufferStorage {
@@ -85,7 +85,7 @@ public final class PatternBufferStorage {
 			stagedItems.setStackInSlot(i, items.getStackInSlot(i).copy());
 		for (ItemStack stack : incomingItems) {
 			if (stack == null || stack.isEmpty()) continue;
-			if (!insert(stagedItems, stack.copy()).isEmpty()) return false;
+			if (!ItemHandlerHelper.insertItem(stagedItems, stack.copy(), false).isEmpty()) return false;
 		}
 		List<FluidTank> stagedTanks = new ArrayList<>(fluids.getTanks());
 		for (var tank : fluids.getFluidTanks()) {
@@ -105,19 +105,11 @@ public final class PatternBufferStorage {
 		for (int i = 0; i < fluids.getTanks(); ++i) {
 			FluidStack result = stagedTanks.get(i).getFluid();
 			FluidStack previous = fluids.getTankAt(i).getFluid();
-			if (FluidStack.areFluidStackTagsEqual(previous, result)
-					&& (previous == null ? result == null : result != null && previous.isFluidStackIdentical(result)))
-				continue;
+			if (previous == null ? result == null : previous.isFluidStackIdentical(result)) continue;
 			fluids.getTankAt(i).drain(Integer.MAX_VALUE, true);
 			if (result != null) fluids.getTankAt(i).fill(result.copy(), true);
 		}
 		return true;
-	}
-
-	private static ItemStack insert(IItemHandler handler, ItemStack stack) {
-		for (int slot = 0; slot < handler.getSlots() && !stack.isEmpty(); ++slot)
-			stack = handler.insertItem(slot, stack, false);
-		return stack;
 	}
 
 	public NBTTagCompound serializeNBT() {
