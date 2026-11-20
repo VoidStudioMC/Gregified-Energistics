@@ -819,14 +819,23 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 
 		public PopupPanel buildUI(PanelSyncManager syncManager, int index) {
 			DynamicSyncHandler dsh = new DynamicSyncHandler().widgetProvider(this::contentBuffer);
-			long[] sentRevision = {-1};
-			syncManager.onServerTick(() -> {
-				long revision = (long) storage.revision() << 1 | (pending ? 1L : 0L);
-				if (sentRevision[0] != revision) {
-					sentRevision[0] = revision;
-					dsh.notifyUpdate(buf -> buf.writeInt(storage.items().getSlots())
-							.writeInt(storage.fluids().getTanks())
-							.writeBoolean(pending));
+			syncManager.onServerTick(new Runnable() {
+				private int sentItemSlots = -1;
+				private int sentFluidSlots = -1;
+				private boolean sentPending;
+
+				@Override
+				public void run() {
+					int itemSlots = storage.items().getSlots();
+					int fluidSlots = storage.fluids().getTanks();
+					boolean waitingForRecovery = pending;
+					if (sentItemSlots == itemSlots && sentFluidSlots == fluidSlots && sentPending == waitingForRecovery)
+						return;
+					sentItemSlots = itemSlots;
+					sentFluidSlots = fluidSlots;
+					sentPending = waitingForRecovery;
+					dsh.notifyUpdate(
+							buf -> buf.writeInt(itemSlots).writeInt(fluidSlots).writeBoolean(waitingForRecovery));
 				}
 			});
 			int popupWidth = 198;

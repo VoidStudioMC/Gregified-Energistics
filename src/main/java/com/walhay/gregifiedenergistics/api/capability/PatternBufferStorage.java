@@ -18,7 +18,6 @@ public final class PatternBufferStorage {
 	private final Runnable contentsChanged;
 	private final InfiniteItemStackHandler items;
 	private FluidTankList fluids = new FluidTankList(false);
-	private int revision;
 
 	public PatternBufferStorage(Runnable contentsChanged) {
 		this.contentsChanged = contentsChanged;
@@ -42,10 +41,6 @@ public final class PatternBufferStorage {
 		return fluids;
 	}
 
-	public int revision() {
-		return revision;
-	}
-
 	public boolean isEmpty() {
 		for (int i = 0; i < items.getSlots(); ++i) {
 			if (!items.getStackInSlot(i).isEmpty()) return false;
@@ -62,7 +57,6 @@ public final class PatternBufferStorage {
 		if (!isEmpty()) return false;
 		items.setSize(itemSlots);
 		fluids = createTanks(fluidSlots);
-		++revision;
 		changed();
 		return true;
 	}
@@ -153,7 +147,6 @@ public final class PatternBufferStorage {
 		items.deserializeNBT(savedItems);
 		fluids = createTanks(fluidSlots);
 		fluids.deserializeNBT(savedFluids);
-		++revision;
 		changed();
 	}
 }
