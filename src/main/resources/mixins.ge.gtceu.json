@@ -17,7 +17,6 @@
 	"pipenet.net.OpticalRoutePathMixin",
 	"pipenet.net.OpticalNetWalkerMixin",
 	"pipenet.net.OpticalPipeNetMixin",
-	"recipes.RecipeMapMixin",
 	"metatileentity.MetaTileEntityMixin",
 	"metatileentity.MetaTileEntityHolderMixin"
   ],

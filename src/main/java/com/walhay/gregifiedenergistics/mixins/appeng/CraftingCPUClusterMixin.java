@@ -10,16 +10,10 @@ import appeng.me.cluster.implementations.CraftingCPUCluster;
 import appeng.tile.crafting.TileCraftingTile;
 import appeng.util.item.AEItemStack;
 import com.walhay.gregifiedenergistics.GregifiedEnergisticsMod;
-import com.walhay.gregifiedenergistics.api.patterns.ISubstitutionStorage;
-import com.walhay.gregifiedenergistics.api.patterns.RecipeFingerprint;
 import com.walhay.gregifiedenergistics.api.patterns.implementations.GhostCircuitPatternWrapper;
 import com.walhay.gregifiedenergistics.api.patterns.implementations.RecipePatternHelper;
-import com.walhay.gregifiedenergistics.api.patterns.substitutions.AESubstitutionStorage;
 import com.walhay.gregifiedenergistics.api.patterns.substitutions.SubstitutionStorage;
-import com.walhay.gregifiedenergistics.mixins.interfaces.IResearchRecipeMapAccessor;
 import com.walhay.gregifiedenergistics.mixins.interfaces.ITaskProgressAccessor;
-import gregtech.api.recipes.Recipe;
-import gregtech.api.recipes.RecipeMaps;
 import java.util.Map;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -66,8 +60,8 @@ public abstract class CraftingCPUClusterMixin {
 			at = @At("HEAD"),
 			argsOnly = true,
 			remap = false)
-	private ICraftingPatternDetails gregified$snapshotRecipeTask(ICraftingPatternDetails pattern) {
-		return pattern instanceof RecipePatternHelper helper ? helper.snapshotForTask() : pattern;
+	private ICraftingPatternDetails gregified$copyRecipeTask(ICraftingPatternDetails pattern) {
+		return pattern instanceof RecipePatternHelper helper ? helper.copy() : pattern;
 	}
 
 	@Inject(method = "writeToNBT", at = @At("TAIL"), remap = false)
@@ -85,14 +79,11 @@ public abstract class CraftingCPUClusterMixin {
 			if (entry.getKey() instanceof RecipePatternHelper helper) {
 				IAEItemStack encoded = AEItemStack.fromItemStack(helper.getPattern());
 				if (encoded != null) encoded.writeToNBT(item);
-				try {
-					item.setString("gregifiedRecipeKey", RecipeFingerprint.of(helper.getRecipe()));
-				} catch (IllegalArgumentException | UnsupportedOperationException unsupported) {
-					item.setBoolean("gregifiedUnsafeRecipe", true);
-				}
+				item.setTag("gregifiedRecipe", helper.writeToNBT());
+				item.removeTag("gregifiedRecipeKey");
+				item.removeTag("gregifiedUnsafeRecipe");
 				item.removeTag("recipeId");
-				ISubstitutionStorage choices = helper.getSubstitutionStorage();
-				if (choices != null) item.setTag(SubstitutionStorage.STORAGE_TAG, choices.serializeNBT());
+				item.removeTag(SubstitutionStorage.STORAGE_TAG);
 			} else if (entry.getKey() instanceof GhostCircuitPatternWrapper wrapper) {
 				item.setInteger("gregifiedGhostCircuit", wrapper.getCircuitValue());
 			} else {
@@ -111,13 +102,12 @@ public abstract class CraftingCPUClusterMixin {
 		gregified$unresolvedTasks = new NBTTagList();
 		NBTTagList saved = data.getTagList("tasks", NBT.TAG_COMPOUND);
 		java.util.List<ICraftingPatternDetails> decoded = new java.util.ArrayList<>();
-		java.util.Set<String> ghostItems = new java.util.HashSet<>();
+		java.util.Set<NBTTagCompound> ghostItems = new java.util.HashSet<>();
 		for (int i = 0; i < saved.tagCount(); ++i) {
 			NBTTagCompound item = saved.getCompoundTagAt(i);
 			if (!item.hasKey("gregifiedGhostCircuit")) continue;
 			IAEItemStack encoded = AEItemStack.fromNBT(item);
-			if (encoded != null)
-				ghostItems.add(RecipeFingerprint.hash(encoded.createItemStack().serializeNBT()));
+			if (encoded != null) ghostItems.add(encoded.createItemStack().serializeNBT());
 		}
 		// Remove our vanilla-decoded keys before restoring either normal or ghost variants.
 		// They can share the same encoded item; removing during restoration would erase one variant.
@@ -129,19 +119,20 @@ public abstract class CraftingCPUClusterMixin {
 					? patternItem.getPatternForItem(stack, getWorld())
 					: null;
 			decoded.add(original);
-			boolean ordinaryCollision =
-					encoded != null && ghostItems.contains(RecipeFingerprint.hash(stack.serializeNBT()));
+			boolean ordinaryCollision = encoded != null && ghostItems.contains(stack.serializeNBT());
 			if (original != null
 					&& ((item.getBoolean("gregifiedOrdinaryPattern")
 									&& (original instanceof appeng.helpers.PatternHelper || ordinaryCollision))
 							|| item.hasKey("gregifiedGhostCircuit")
+							|| item.hasKey("gregifiedRecipe")
 							|| item.hasKey("gregifiedRecipeKey")
 							|| item.hasKey("recipeId")
 							|| item.getBoolean("gregifiedUnsafeRecipe"))) tasks.remove(original);
 		}
 		for (int i = 0; i < saved.tagCount(); ++i) {
 			NBTTagCompound item = saved.getCompoundTagAt(i);
-			boolean recipeTask = item.hasKey("gregifiedRecipeKey")
+			boolean recipeTask = item.hasKey("gregifiedRecipe")
+					|| item.hasKey("gregifiedRecipeKey")
 					|| item.hasKey("recipeId")
 					|| item.getBoolean("gregifiedUnsafeRecipe");
 			IAEItemStack encoded = AEItemStack.fromNBT(item);
@@ -150,8 +141,7 @@ public abstract class CraftingCPUClusterMixin {
 			// Legacy unmarked circuit tasks are ambiguous: they may have consumed physical or ghost circuits.
 			ICraftingPatternDetails wrapped = GhostCircuitPatternWrapper.wrap(original);
 			if (!recipeTask && item.getBoolean("gregifiedOrdinaryPattern")) {
-				boolean ordinaryCollision =
-						encoded != null && ghostItems.contains(RecipeFingerprint.hash(stack.serializeNBT()));
+				boolean ordinaryCollision = encoded != null && ghostItems.contains(stack.serializeNBT());
 				if (original == null) {
 					// Opaque addon tasks may restore themselves without an encoded pattern item.
 					if (stack.getItem() instanceof ICraftingPatternItem) gregified$deferCancellation(item);
@@ -173,16 +163,9 @@ public abstract class CraftingCPUClusterMixin {
 			try {
 				ICraftingPatternDetails restored;
 				if (recipeTask) {
-					String key = item.getString("gregifiedRecipeKey");
-					Recipe recipe = ((IResearchRecipeMapAccessor) RecipeMaps.ASSEMBLY_LINE_RECIPES).getRecipeByKey(key);
-					if (recipe == null) {
-						gregified$deferCancellation(item);
-						continue;
-					}
-					RecipePatternHelper helper = new RecipePatternHelper(recipe, stack);
-					helper.injectSubstitutions(
-							new AESubstitutionStorage(item.getCompoundTag(SubstitutionStorage.STORAGE_TAG)));
-					if (!helper.isValidPattern()) {
+					RecipePatternHelper helper =
+							RecipePatternHelper.readFromNBT(item.getCompoundTag("gregifiedRecipe"), stack);
+					if (helper == null) {
 						gregified$deferCancellation(item);
 						continue;
 					}
@@ -218,7 +201,7 @@ public abstract class CraftingCPUClusterMixin {
 		if (!gregified$cancelPending) return;
 		if (grid != null && getCore() != null) {
 			GregifiedEnergisticsMod.LOGGER.warn(
-					"Cancelling saved crafting job with missing, changed, or legacy-only recipe identity; returning CPU-owned inputs through AE2");
+					"Cancelling saved crafting job whose recipe could not be restored; returning CPU-owned inputs through AE2");
 			cancel();
 		}
 		ci.cancel();

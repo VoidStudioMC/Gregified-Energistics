@@ -336,6 +336,7 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 			@Override
 			public void run() {
 				List<String> names = new java.util.ArrayList<>(substitutionStorage.getOptions());
+				names.removeIf(name -> name.startsWith("items:"));
 				if (!names.equals(sentOptions)) {
 					sentOptions = names;
 					options.notifyUpdate(buf -> {

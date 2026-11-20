@@ -7,7 +7,6 @@ import appeng.api.storage.channels.IFluidStorageChannel;
 import appeng.api.storage.channels.IItemStorageChannel;
 import appeng.api.storage.data.IAEFluidStack;
 import appeng.api.storage.data.IAEItemStack;
-import com.walhay.gregifiedenergistics.api.util.GTHelperUtility;
 import gregtech.api.recipes.Recipe;
 import gregtech.api.recipes.ingredients.GTRecipeInput;
 import java.util.Collection;
@@ -17,6 +16,7 @@ import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
 import net.minecraftforge.fluids.FluidStack;
+import net.minecraftforge.oredict.OreDictionary;
 
 public abstract class AbstractPatternHelper implements IProvidablePattern, ISubstitutionHandler {
 
@@ -29,12 +29,17 @@ public abstract class AbstractPatternHelper implements IProvidablePattern, ISubs
 	protected IAEFluidStack[] fluidInputs;
 	private int priority = 0;
 	private final Map<Integer, GTRecipeInput> subMap = new HashMap<>();
+	private String substitutionPrefix;
 	protected ISubstitutionStorage substitutionStorage;
 	protected boolean validRecipe = true;
 
 	protected void parseRecipe(Recipe recipe) {
 		validRecipe = true;
 		subMap.clear();
+		ItemStack output = recipe.getOutputs().isEmpty()
+				? ItemStack.EMPTY
+				: recipe.getOutputs().get(0);
+		substitutionPrefix = "input:" + output.getItem().getRegistryName() + "@" + output.getMetadata() + ":";
 		inputs = new IAEItemStack[recipe.getInputs().size()];
 		for (int i = 0; i < inputs.length; ++i) {
 			GTRecipeInput input = recipe.getInputs().get(i);
@@ -82,13 +87,9 @@ public abstract class AbstractPatternHelper implements IProvidablePattern, ISubs
 		substitutionStorage = storage;
 		for (Map.Entry<Integer, GTRecipeInput> entry : subMap.entrySet()) {
 			GTRecipeInput input = entry.getValue();
-			String name;
-			try {
-				name = GTHelperUtility.getRecipeInputName(input);
-			} catch (IllegalArgumentException unsupported) {
-				validRecipe = false;
-				continue;
-			}
+			String name = input.isOreDict()
+					? OreDictionary.getOreName(input.getOreDict())
+					: substitutionPrefix + entry.getKey();
 			ItemStack[] candidates = input.getInputStacks();
 			storage.registerCandidates(name, candidates);
 			java.util.List<ItemStack> available = storage.getCandidates(name);

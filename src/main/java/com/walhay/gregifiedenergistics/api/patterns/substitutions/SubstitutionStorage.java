@@ -68,8 +68,8 @@ public class SubstitutionStorage extends MTETrait implements ISubstitutionStorag
 				|| metaTileEntity.getWorld().isRemote
 				|| syncedRevision == data.getRevision()) return;
 		syncedRevision = data.getRevision();
-		NBTTagCompound snapshot = data.serializeSyncNBT();
-		writeCustomData(GregifiedEnergisticsDataCodes.SUBSTITUTION_CHANGE, buf -> buf.writeCompoundTag(snapshot));
+		NBTTagCompound tag = data.serializeSyncNBT();
+		writeCustomData(GregifiedEnergisticsDataCodes.SUBSTITUTION_CHANGE, buf -> buf.writeCompoundTag(tag));
 	}
 
 	@Override
@@ -102,20 +102,20 @@ public class SubstitutionStorage extends MTETrait implements ISubstitutionStorag
 
 	@Override
 	public void receiveInitialSyncData(@NotNull PacketBuffer buf) {
-		readSnapshot(buf);
+		readData(buf);
 	}
 
 	@Override
 	public void receiveCustomData(int discriminator, @NotNull PacketBuffer buf) {
-		if (discriminator == GregifiedEnergisticsDataCodes.SUBSTITUTION_CHANGE) readSnapshot(buf);
+		if (discriminator == GregifiedEnergisticsDataCodes.SUBSTITUTION_CHANGE) readData(buf);
 	}
 
-	private void readSnapshot(PacketBuffer buf) {
+	private void readData(PacketBuffer buf) {
 		try {
-			NBTTagCompound snapshot = buf.readCompoundTag();
-			if (snapshot != null) data.deserializeSyncNBT(snapshot);
+			NBTTagCompound tag = buf.readCompoundTag();
+			if (tag != null) data.deserializeSyncNBT(tag);
 		} catch (IOException exception) {
-			throw new IllegalArgumentException("Invalid substitution snapshot", exception);
+			throw new IllegalArgumentException("Invalid substitution data", exception);
 		}
 	}
 }

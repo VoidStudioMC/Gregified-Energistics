@@ -13,7 +13,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants.NBT;
 
-/** A strongly owned snapshot of task choices, with item identities for reload-safe selection. */
+/** Stores provider choices by item so candidate reordering preserves the selection. */
 public class AESubstitutionStorage implements ISubstitutionStorage {
 	private final Map<String, Integer> options = new LinkedHashMap<>();
 	private final Map<String, ItemStack> selected = new LinkedHashMap<>();
@@ -75,6 +75,20 @@ public class AESubstitutionStorage implements ISubstitutionStorage {
 		}
 		List<ItemStack> previous = candidates.put(name, copies);
 		if (!sameCandidates(previous, copies)) revision++;
+		if (name.startsWith("input:") && !options.containsKey(name)) {
+			// Older saves stored non-ore choices under hashes. Reuse an unambiguous selected item.
+			ItemStack oldChoice = null;
+			for (Map.Entry<String, ItemStack> entry : selected.entrySet()) {
+				if (!entry.getKey().startsWith("items:")
+						|| copies.stream().noneMatch(stack -> sameItem(stack, entry.getValue()))) continue;
+				if (oldChoice != null && !sameItem(oldChoice, entry.getValue())) {
+					oldChoice = null;
+					break;
+				}
+				oldChoice = entry.getValue();
+			}
+			if (oldChoice != null) selected.put(name, oldChoice.copy());
+		}
 		int option = getOption(name);
 		if (!copies.isEmpty()) setOption(name, option);
 	}
