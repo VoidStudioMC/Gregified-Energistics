@@ -70,9 +70,7 @@ The Gradle wrapper requires JDK 17 or newer; CI uses JDK 25. Gradle provisions t
 
 `build` includes tests and formatting checks and leaves source files unchanged. Development run files are under `run/`. Server startup requires an accepted Minecraft EULA in that directory. Built JARs are under `build/libs/`.
 
-Versions and artifact checksums are recorded in `gradle.lockfile`, `gradle/verification-metadata.xml` and `gradle/bundled-dependencies.sha256`. Review dependency changes before updating these files. The wrapper distribution has its own SHA-256 pin. Publishing is disabled by default; configured uploads use `MODRINTH_TOKEN` or `CURSEFORGE_TOKEN` and respect `publish_with_changelog`.
-
-The Russian audit and remediation record is in [CODEBASE_AUDIT_RU.md](CODEBASE_AUDIT_RU.md).
+Dependency versions are declared in the Gradle scripts, and bundled GregTech artifact checksums are pinned in `gradle/scripts/verification.gradle`. Review dependency changes before updating these values. The wrapper distribution has its own SHA-256 pin. Generated files and build reports are excluded from Git. Publishing is disabled by default; configured uploads use `MODRINTH_TOKEN` or `CURSEFORGE_TOKEN` and respect `publish_with_changelog`.
 
 ## Screenshots
 
