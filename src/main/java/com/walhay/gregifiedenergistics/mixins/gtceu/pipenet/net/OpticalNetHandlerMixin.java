@@ -32,6 +32,14 @@ public abstract class OpticalNetHandlerMixin implements INetRecipeHandler {
 	@Invoker(remap = false)
 	protected abstract boolean callIsNetInvalidForTraversal();
 
+	@Invoker(remap = false)
+	protected abstract void callSetPipesActive();
+
+	@Override
+	@Unique public void onRecipesTransferred() {
+		if (!callIsNetInvalidForTraversal()) callSetPipesActive();
+	}
+
 	@Override
 	@Unique public void onRecipesUpdate(Set<INetRecipeHandler> seen) {
 		if (!seen.add(this)) return;

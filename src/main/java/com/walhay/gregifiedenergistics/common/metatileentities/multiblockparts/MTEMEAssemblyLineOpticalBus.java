@@ -180,11 +180,9 @@ public class MTEMEAssemblyLineOpticalBus extends MTEAbstractAssemblyLineBus impl
 					return;
 				}
 
-				var recipes = data.getRecipes();
-				if (recipes == null || recipes.isEmpty()) {
-					clearPatternData();
-					return;
-				}
+				Set<INetRecipeHandler> seen = INetRecipeHandler.newTraversal();
+				Collection<Recipe> recipes = data.getRecipes(seen);
+				if (recipes == null) recipes = Collections.emptyList();
 
 				// Recipe.equals only compares inputs; registered recipes are immutable.
 				Set<Recipe> available = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -201,6 +199,7 @@ public class MTEMEAssemblyLineOpticalBus extends MTEAbstractAssemblyLineBus impl
 				}
 
 				notifyPatternChange();
+				seen.forEach(INetRecipeHandler::onRecipesTransferred);
 				return;
 			}
 

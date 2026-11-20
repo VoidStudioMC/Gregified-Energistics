@@ -11,6 +11,9 @@ public interface INetRecipeHandler {
 
 	void onRecipesUpdate(Set<INetRecipeHandler> seen);
 
+	/** Signals data transfer after a consumer's available recipes change. */
+	default void onRecipesTransferred() {}
+
 	static Set<INetRecipeHandler> newTraversal() {
 		return Collections.newSetFromMap(new IdentityHashMap<>());
 	}
