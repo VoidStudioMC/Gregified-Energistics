@@ -17,7 +17,7 @@ import org.jetbrains.annotations.NotNull;
 
 public class SubstitutionStorage extends MTETrait implements ISubstitutionStorage {
 	public static final String STORAGE_TAG = "SubstitutionStorage";
-	private final AESubstitutionStorage data = new AESubstitutionStorage(new NBTTagCompound());
+	private final SubstitutionData data = new SubstitutionData();
 	private long syncedRevision = -1;
 
 	public SubstitutionStorage(MetaTileEntity mte) {

@@ -3,7 +3,7 @@ package com.walhay.gregifiedenergistics.api;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.walhay.gregifiedenergistics.api.patterns.substitutions.AESubstitutionStorage;
+import com.walhay.gregifiedenergistics.api.patterns.substitutions.SubstitutionData;
 import net.minecraft.init.Bootstrap;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
@@ -20,17 +20,19 @@ public class SubstitutionPersistenceTest {
 
 	@Test
 	void choicesSurviveTwoSaveCycles() {
-		AESubstitutionStorage storage = new AESubstitutionStorage(new NBTTagCompound());
+		SubstitutionData storage = new SubstitutionData();
 		storage.setOption("circuitLuV", 2);
-		storage = new AESubstitutionStorage(storage.serializeNBT());
-		assertEquals(2, storage.getOption("circuitLuV"));
-		storage = new AESubstitutionStorage(storage.serializeNBT());
-		assertEquals(2, storage.getOption("circuitLuV"));
+		for (int cycle = 0; cycle < 2; ++cycle) {
+			NBTTagCompound saved = storage.serializeNBT();
+			storage = new SubstitutionData();
+			storage.deserializeNBT(saved);
+			assertEquals(2, storage.getOption("circuitLuV"));
+		}
 	}
 
 	@Test
-	void loadingAnEmptySnapshotClearsOldChoices() {
-		AESubstitutionStorage storage = new AESubstitutionStorage(new NBTTagCompound());
+	void loadingEmptyDataClearsOldChoices() {
+		SubstitutionData storage = new SubstitutionData();
 		storage.setOption("circuitLuV", 2);
 		storage.deserializeNBT(new NBTTagCompound());
 		assertTrue(storage.getOptions().isEmpty());
@@ -38,7 +40,7 @@ public class SubstitutionPersistenceTest {
 
 	@Test
 	void selectedItemSurvivesCandidateReorderingAndReload() {
-		AESubstitutionStorage storage = new AESubstitutionStorage(new NBTTagCompound());
+		SubstitutionData storage = new SubstitutionData();
 		ItemStack first = new ItemStack(Items.DIAMOND);
 		ItemStack second = new ItemStack(Items.DIAMOND);
 		NBTTagCompound identity = new NBTTagCompound();
@@ -46,7 +48,9 @@ public class SubstitutionPersistenceTest {
 		second.setTagCompound(identity);
 		storage.registerCandidates("variants", new ItemStack[] {first, second});
 		storage.setOption("variants", 1);
-		storage = new AESubstitutionStorage(storage.serializeNBT());
+		NBTTagCompound saved = storage.serializeNBT();
+		storage = new SubstitutionData();
+		storage.deserializeNBT(saved);
 		storage.registerCandidates("variants", new ItemStack[] {second, first});
 		assertEquals(0, storage.getOption("variants"));
 		assertEquals(identity, storage.getCandidates("variants").get(0).getTagCompound());
@@ -54,7 +58,7 @@ public class SubstitutionPersistenceTest {
 
 	@Test
 	void invalidIndicesAndEmptyCandidatesDoNotReplaceTheChoice() {
-		AESubstitutionStorage storage = new AESubstitutionStorage(new NBTTagCompound());
+		SubstitutionData storage = new SubstitutionData();
 		storage.registerCandidates(
 				"variants", new ItemStack[] {ItemStack.EMPTY, new ItemStack(Items.DIAMOND), new ItemStack(Items.COAL)});
 		storage.setOption("variants", 1);

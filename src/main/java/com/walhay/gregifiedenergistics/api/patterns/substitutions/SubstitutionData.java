@@ -14,15 +14,11 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants.NBT;
 
 /** Stores provider choices by item so candidate reordering preserves the selection. */
-public class AESubstitutionStorage implements ISubstitutionStorage {
+public class SubstitutionData implements ISubstitutionStorage {
 	private final Map<String, Integer> options = new LinkedHashMap<>();
 	private final Map<String, ItemStack> selected = new LinkedHashMap<>();
 	private final Map<String, List<ItemStack>> candidates = new LinkedHashMap<>();
 	private long revision;
-
-	public AESubstitutionStorage(NBTTagCompound tag) {
-		deserializeNBT(tag);
-	}
 
 	@Override
 	public int getOption(String name) {
