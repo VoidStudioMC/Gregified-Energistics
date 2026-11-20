@@ -32,9 +32,6 @@ public abstract class OpticalNetHandlerMixin implements INetRecipeHandler {
 	@Invoker(remap = false)
 	protected abstract boolean callIsNetInvalidForTraversal();
 
-	@Invoker(remap = false)
-	protected abstract void callSetPipesActive();
-
 	@Override
 	@Unique public void onRecipesUpdate(Set<INetRecipeHandler> seen) {
 		if (!seen.add(this)) return;
@@ -47,9 +44,7 @@ public abstract class OpticalNetHandlerMixin implements INetRecipeHandler {
 		if (!seen.add(this)) return null;
 		IOpticalNetRecipeHandler handler = getRecipeHandler();
 		if (handler == null || !handler.isTransmitter()) return null;
-		Collection<Recipe> recipes = handler.getRecipes(seen);
-		if (recipes != null) callSetPipesActive();
-		return recipes;
+		return handler.getRecipes(seen);
 	}
 
 	@Unique private IOpticalNetRecipeHandler getRecipeHandler() {

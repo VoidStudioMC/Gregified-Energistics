@@ -20,6 +20,8 @@ import gregtech.client.renderer.texture.Textures;
 import gregtech.common.pipelike.optical.tile.TileEntityOpticalPipe;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 import net.minecraft.client.resources.I18n;
@@ -184,11 +186,19 @@ public class MTEMEAssemblyLineOpticalBus extends MTEAbstractAssemblyLineBus impl
 					return;
 				}
 
+				// Recipe.equals only compares inputs; registered recipes are immutable.
+				Set<Recipe> available = Collections.newSetFromMap(new IdentityHashMap<>());
+				available.addAll(recipes);
+				if (available.size() == patterns.size()
+						&& patterns.stream().allMatch(pattern -> available.contains(pattern.getRecipe()))) return;
+
 				patterns.clear();
-				recipes.stream().map(RecipePatternHelper::new).forEach(pattern -> {
+				for (Recipe recipe : recipes) {
+					if (!available.remove(recipe)) continue;
+					RecipePatternHelper pattern = new RecipePatternHelper(recipe);
 					pattern.injectSubstitutions(substitutionStorage);
 					patterns.add(pattern);
-				});
+				}
 
 				notifyPatternChange();
 				return;
