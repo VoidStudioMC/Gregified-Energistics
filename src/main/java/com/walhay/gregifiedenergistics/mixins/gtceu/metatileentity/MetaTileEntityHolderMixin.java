@@ -7,13 +7,10 @@ import com.walhay.gregifiedenergistics.api.metatileentity.ICraftingProviderAcces
 import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.api.metatileentity.MetaTileEntityHolder;
 import net.minecraft.inventory.InventoryCrafting;
-import org.spongepowered.asm.mixin.Implements;
-import org.spongepowered.asm.mixin.Interface;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
 @Mixin(MetaTileEntityHolder.class)
-@Implements(@Interface(iface = ICraftingProvider.class, prefix = "craftingProvider$"))
 public abstract class MetaTileEntityHolderMixin implements ICraftingProvider {
 
 	@Shadow(remap = false)

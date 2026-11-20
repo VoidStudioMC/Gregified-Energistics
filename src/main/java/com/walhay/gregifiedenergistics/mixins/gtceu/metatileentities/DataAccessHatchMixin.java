@@ -8,8 +8,6 @@ import java.util.Collection;
 import java.util.Set;
 import net.minecraft.util.ResourceLocation;
 import org.spongepowered.asm.mixin.Final;
-import org.spongepowered.asm.mixin.Implements;
-import org.spongepowered.asm.mixin.Interface;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -18,7 +16,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(MetaTileEntityDataAccessHatch.class)
-@Implements(@Interface(iface = INetRecipeHandler.class, prefix = "dataHandler$"))
 public abstract class DataAccessHatchMixin extends MetaTileEntityMultiblockNotifiablePart implements INetRecipeHandler {
 
 	private DataAccessHatchMixin(ResourceLocation metaTileEntityId, int tier, boolean isExportHatch) {
