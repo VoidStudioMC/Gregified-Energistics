@@ -1,5 +1,6 @@
 package com.walhay.gregifiedenergistics.common.metatileentities.multiblockparts;
 
+import static com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig.MAX_SLOTS;
 import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuiTextures.BLOCKING_MODE;
 import static com.walhay.gregifiedenergistics.api.patterns.substitutions.SubstitutionStorage.STORAGE_TAG;
 import static com.walhay.gregifiedenergistics.api.util.BlockingMode.BLOCKING_MODE_TAG;
@@ -178,11 +179,9 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 	@Override
 	public ModularPanel buildUI(PosGuiData guiData, PanelSyncManager sync, UISettings settings) {
 
-		int patternColumns = GregifiedEnergisticsConfig.guiConfig.patternSlotsPerLine;
-		if (patternColumns <= 0) patternColumns = 9;
 		int columns = Math.max(
-				Math.min(16, patternColumns),
-				Math.max(1, Math.min(16, GregifiedEnergisticsConfig.guiConfig.substitutionSlotsPerLine)));
+				GregifiedEnergisticsConfig.guiConfig.getPatternColumns(),
+				GregifiedEnergisticsConfig.guiConfig.getSubstitutionColumns());
 		ModularPanel panel = GTGuis.createPanel(
 				this, Math.min(300, Math.max(199, (int) Math.ceil((columns * 18 + 10) / 0.9) + 14)), 200);
 		// Include the 32-pixel tabs above the panel when centring the complete GUI.
@@ -323,11 +322,8 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 					.widthRel(1f)
 					.heightRel(1f)
 					.scrollable()
-					.mapTo(
-							Math.max(1, Math.min(16, GregifiedEnergisticsConfig.guiConfig.substitutionSlotsPerLine)),
-							names,
-							(index, name) -> (Widget<?>)
-									new SubstitutionSlotWidget().storage(substitutionStorage, name, manager));
+					.mapTo(GregifiedEnergisticsConfig.guiConfig.getSubstitutionColumns(), names, (index, name) ->
+							(Widget<?>) new SubstitutionSlotWidget().storage(substitutionStorage, name, manager));
 		});
 		// New ingredient handlers must be registered outside the handler-map iteration.
 		syncHandler.onServerTick(new Runnable() {
@@ -447,7 +443,7 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 			NBTTagCompound entry = entries.getCompoundTagAt(i);
 			int slot = entry.getInteger(SEND_SLOT_TAG);
 			FluidStack fluid = FluidStack.loadFluidStackFromNBT(entry);
-			if (slot >= 0 && slot < 4096 && fluid != null && fluid.amount > 0) queue.put(slot, fluid);
+			if (slot >= 0 && slot < MAX_SLOTS && fluid != null && fluid.amount > 0) queue.put(slot, fluid);
 		}
 	}
 
@@ -472,7 +468,7 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 			NBTTagCompound entry = entries.getCompoundTagAt(i);
 			int slot = entry.getInteger(SEND_SLOT_TAG);
 			ItemStack stack = InfiniteItemStackHandler.readStack(entry);
-			if (slot >= 0 && slot < 4096 && !stack.isEmpty()) waitingToSend.put(slot, stack);
+			if (slot >= 0 && slot < MAX_SLOTS && !stack.isEmpty()) waitingToSend.put(slot, stack);
 		}
 		readFluidQueue(data.getTagList(FLUID_TO_SEND_TAG, NBT.TAG_COMPOUND), fluidWaitingToSend);
 		readFluidQueue(data.getTagList(OWNED_FLUID_TAG, NBT.TAG_COMPOUND), extractedFluids);

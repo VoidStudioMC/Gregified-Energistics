@@ -1,5 +1,7 @@
 package com.walhay.gregifiedenergistics.api.capability;
 
+import static com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig.MAX_SLOTS;
+
 import gregtech.api.capability.impl.FluidTankList;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +16,6 @@ import net.minecraftforge.items.IItemHandler;
 /** Owned buffer contents. Shape changes require an empty buffer; batch insertion commits only after full preflight. */
 public final class PatternBufferStorage {
 
-	private static final int MAX_SLOTS = 4096;
 	private final Runnable contentsChanged;
 	private final InfiniteItemStackHandler items;
 	private FluidTankList fluids = new FluidTankList(false);

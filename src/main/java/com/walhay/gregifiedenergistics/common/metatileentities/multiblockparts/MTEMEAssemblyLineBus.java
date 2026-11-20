@@ -37,8 +37,8 @@ public class MTEMEAssemblyLineBus extends MTEAbstractAssemblyLineBus {
 
 	public static final String PATTERN_INVENTORY_TAG = "PatternInventory";
 
-	private final DataStickHandler patternHandler = new DataStickHandler(
-			Math.max(1, Math.min(4096, GregifiedEnergisticsConfig.machineConfig.patternHandlerSize)));
+	private final DataStickHandler patternHandler =
+			new DataStickHandler(GregifiedEnergisticsConfig.machineConfig.getPatternHandlerSize());
 
 	public MTEMEAssemblyLineBus(ResourceLocation metaTileEntityId) {
 		super(metaTileEntityId, LuV);
@@ -61,8 +61,7 @@ public class MTEMEAssemblyLineBus extends MTEAbstractAssemblyLineBus {
 	@SuppressWarnings("UnstableApiUsage")
 	public Widget<?> createPatternList(ModularPanel panel, PanelSyncManager syncHandler) {
 		panel.child(SlotGroupWidget.playerInventory(false).left(7).bottom(7));
-		int configured = GregifiedEnergisticsConfig.guiConfig.patternSlotsPerLine;
-		int columns = Math.min(patternHandler.getSlots(), configured <= 0 ? 9 : Math.max(1, Math.min(16, configured)));
+		int columns = Math.min(patternHandler.getSlots(), GregifiedEnergisticsConfig.guiConfig.getPatternColumns());
 		syncHandler.registerSlotGroup("item_inv", columns);
 		return Flow.column()
 				.name("pattern list")

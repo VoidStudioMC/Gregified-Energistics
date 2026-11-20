@@ -1,5 +1,6 @@
 package com.walhay.gregifiedenergistics.common.metatileentities.multiblockparts;
 
+import static com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig.MAX_SLOTS;
 import static gregtech.api.GTValues.ZPM;
 
 import appeng.api.AEApi;
@@ -666,7 +667,7 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 			int slots = buffer.readInt();
 			int fluids = buffer.readInt();
 			boolean waitingForRecovery = buffer.readBoolean();
-			if (slots < 0 || slots > 4096 || fluids < 0 || fluids > 4096)
+			if (slots < 0 || slots > MAX_SLOTS || fluids < 0 || fluids > MAX_SLOTS)
 				throw new IllegalArgumentException("Invalid buffer GUI shape");
 			if (syncManager.isClient()
 					&& (slots != storage.items().getSlots()

@@ -1,5 +1,7 @@
 package com.walhay.gregifiedenergistics.api.capability;
 
+import static com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig.MAX_SLOTS;
+
 import appeng.api.networking.crafting.ICraftingPatternDetails;
 import appeng.items.misc.ItemEncodedPattern;
 import com.google.common.base.Objects;
@@ -16,7 +18,6 @@ import net.minecraftforge.common.util.Constants.NBT;
 
 public abstract class AbstractPatternItemHandler extends GTItemStackHandler {
 
-	private static final int MAX_RECOVERED_SLOTS = 4096;
 	private final int configuredSize;
 	private ICraftingPatternDetails[] patterns;
 
@@ -34,7 +35,7 @@ public abstract class AbstractPatternItemHandler extends GTItemStackHandler {
 			NBTTagCompound entry = items.getCompoundTagAt(i);
 			int slot = entry.getInteger("Slot");
 			if (slot < 0 || new ItemStack(entry).isEmpty()) continue;
-			if (slot >= Math.max(configuredSize, MAX_RECOVERED_SLOTS)) {
+			if (slot >= Math.max(configuredSize, MAX_SLOTS)) {
 				throw new IllegalArgumentException(
 						"Saved pattern slot is outside the supported recovery range: " + slot);
 			}
