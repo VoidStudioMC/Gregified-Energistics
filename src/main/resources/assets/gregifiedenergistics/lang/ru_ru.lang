@@ -38,8 +38,6 @@ gregifiedenergistics.machine.me.copy_settings=Настройки замен ск
 gregifiedenergistics.machine.me.paste_settings=Настройки замен загружены с карты памяти.
 
 gregifiedenergistics.gui.substitution=Замена
-gregifiedenergistics.gui.substitution_list=Список замен
-gregifiedenergistics.gui.pattern_list=Шаблоны сборочной линии
 
 gregifiedenergistics.gui.buffer_contents=Содержимое буфера №%d
 gregifiedenergistics.gui.buffer_items=Предметы

@@ -2,6 +2,12 @@ package com.walhay.gregifiedenergistics.common.metatileentities.multiblockparts;
 
 import static com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig.MAX_SLOTS;
 import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuiTextures.BLOCKING_MODE;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.CONTENT_TOP;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.GRID_VIEWPORT_HEIGHT;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.INVENTORY_SPACE;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.MIN_WIDTH;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.PADDING;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.SLOT_SIZE;
 import static com.walhay.gregifiedenergistics.api.patterns.substitutions.SubstitutionStorage.STORAGE_TAG;
 import static com.walhay.gregifiedenergistics.api.util.BlockingMode.BLOCKING_MODE_TAG;
 
@@ -20,7 +26,6 @@ import codechicken.lib.render.pipeline.IVertexOperation;
 import codechicken.lib.vec.Matrix4;
 import com.cleanroommc.modularui.api.drawable.IKey;
 import com.cleanroommc.modularui.drawable.GuiTextures;
-import com.cleanroommc.modularui.drawable.Icon;
 import com.cleanroommc.modularui.drawable.ItemDrawable;
 import com.cleanroommc.modularui.factory.PosGuiData;
 import com.cleanroommc.modularui.screen.ModularPanel;
@@ -41,6 +46,7 @@ import com.cleanroommc.modularui.widgets.slot.ItemSlot;
 import com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig;
 import com.walhay.gregifiedenergistics.api.capability.InfiniteItemStackHandler;
 import com.walhay.gregifiedenergistics.api.metatileentity.MetaTileEntityCraftingProvider;
+import com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis;
 import com.walhay.gregifiedenergistics.api.patterns.AbstractPatternHelper;
 import com.walhay.gregifiedenergistics.api.patterns.ISubstitutionNotifiable;
 import com.walhay.gregifiedenergistics.api.patterns.ISubstitutionStorage;
@@ -60,7 +66,6 @@ import gregtech.api.metatileentity.multiblock.MultiblockAbility;
 import gregtech.api.metatileentity.multiblock.MultiblockControllerBase;
 import gregtech.api.metatileentity.multiblock.RecipeMapMultiblockController;
 import gregtech.api.mui.GTGuiTextures;
-import gregtech.api.mui.GTGuis;
 import gregtech.client.renderer.texture.cube.SimpleOverlayRenderer;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.util.Collection;
@@ -80,7 +85,6 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.TextComponentTranslation;
-import net.minecraft.util.text.TextFormatting;
 import net.minecraft.world.World;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.util.Constants.NBT;
@@ -182,10 +186,9 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 		int columns = Math.max(
 				GregifiedEnergisticsConfig.guiConfig.getPatternColumns(),
 				GregifiedEnergisticsConfig.guiConfig.getSubstitutionColumns());
-		ModularPanel panel = GTGuis.createPanel(
-				this, Math.min(300, Math.max(199, (int) Math.ceil((columns * 18 + 10) / 0.9) + 14)), 200);
-		// Include the 32-pixel tabs above the panel when centring the complete GUI.
-		panel.topRel(0.5f, 16, 0.5f);
+		int width = Math.min(300, Math.max(MIN_WIDTH, columns * SLOT_SIZE + 2 * PADDING + 8));
+		ModularPanel panel =
+				GregifiedEnergisticsGuis.createPanel(this, width, CONTENT_TOP + GRID_VIEWPORT_HEIGHT + INVENTORY_SPACE);
 
 		var controller = new PagedWidget.Controller();
 
@@ -201,11 +204,11 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 
 		int pageCounter = 0;
 
-		var patternList = createPatternList(panel, sync);
+		var patternList = createPatternList(sync);
 		if (patternList != null) {
 			tabs.child(new PageButton(pageCounter++, controller)
 					.tab(GuiTextures.TAB_TOP, 0)
-					.addTooltipLine(IKey.lang("gregtech.machine.workbench.tab.workbench"))
+					.addTooltipLine(IKey.lang("gregifiedenergistics.gui.patterns_grid"))
 					.overlay(new ItemDrawable(AEApi.instance()
 									.definitions()
 									.items()
@@ -218,13 +221,10 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 			paged.addPage(patternList);
 		}
 
-		var substitutionList = createSubstitutionList(panel, sync);
+		var substitutionList = createSubstitutionList(sync);
 		if (substitutionList != null) {
-			tabs.child(new PageButton(pageCounter, controller)
+			tabs.child(new PageButton(pageCounter++, controller)
 					.tab(GuiTextures.TAB_TOP, 0)
-					.addTooltipLine(IKey.lang("gregtech.machine.workbench.tab.item_list"))
-					.addTooltipLine(
-							IKey.lang("gregtech.machine.workbench.storage_note").style(TextFormatting.DARK_GRAY))
 					.addTooltipLine(IKey.lang("gregifiedenergistics.gui.substitutions_grid"))
 					.overlay(new ItemDrawable(AEApi.instance()
 									.definitions()
@@ -238,9 +238,15 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 			paged.addPage(substitutionList);
 		}
 
+		if (pageCounter > 1) {
+			// Centre the panel together with GregTech's tabs above it.
+			panel.topRel(0.5f, GuiTextures.TAB_TOP.getHeight() / 2, 0.5f).child(tabs);
+		}
 		return panel.child(createButtonBar(sync))
-				.child(tabs)
-				.child(paged.top(7).widthRel(0.9f).controller(controller));
+				.child(paged.top(CONTENT_TOP)
+						.width(width - 2 * PADDING)
+						.height(GRID_VIEWPORT_HEIGHT)
+						.controller(controller));
 	}
 
 	@SuppressWarnings("UnstableApiUsage")
@@ -254,27 +260,8 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 		sync.syncValue("fluid_mode", fluidStateValue);
 		sync.syncValue("blocking_mode", blockingStateValue);
 
-		Icon detail = GTGuiTextures.BUTTON_POWER_DETAIL.asIcon().size(18, 6).marginTop(24);
-
-		return Flow.column()
-				.right(7)
-				.bottom(7)
-				.width(18)
-				.height(18 * 4 + 5)
-				.child(new ToggleButton()
-						.name("power_button")
-						.size(18)
-						.disableHoverBackground()
-						.overlay(true, detail, GTGuiTextures.BUTTON_POWER[1])
-						.overlay(false, detail, GTGuiTextures.BUTTON_POWER[0])
-						.value(workingStateValue)
-						.tooltipAutoUpdate(true)
-						.tooltipBuilder(t -> t.addLine(IKey.lang(
-								workingStateValue.getBoolValue()
-										? "gregifiedenergistics.gui.working.enabled"
-										: "gregifiedenergistics.gui.working.disabled")))
-						.marginTop(4)
-						.top(18 * 3 + 5))
+		return GregifiedEnergisticsGuis.buttonColumn()
+				.child(GregifiedEnergisticsGuis.workingButton(workingStateValue))
 				.child(new ToggleButton()
 						.value(fluidStateValue)
 						.tooltipAutoUpdate(true)
@@ -282,9 +269,9 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 								fluidStateValue.getBoolValue()
 										? "gregifiedenergistics.gui.fluid_mode.enabled"
 										: "gregifiedenergistics.gui.fluid_mode.disabled")))
-						.top(18 * 2)
-						.overlay(false, new ItemDrawable(Items.BUCKET))
-						.overlay(true, new ItemDrawable(Items.WATER_BUCKET)))
+						.top(2 * SLOT_SIZE)
+						.overlay(false, GTGuiTextures.BUTTON_FLUID[0])
+						.overlay(true, GTGuiTextures.BUTTON_FLUID[1]))
 				.child(new CycleButtonWidget()
 						.value(blockingStateValue)
 						.tooltipAutoUpdate(true)
@@ -294,21 +281,21 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 									case BLOCKING_MODE -> "gregifiedenergistics.gui.blocking_mode";
 									case CRAFTING_BLOCKING_MODE -> "gregifiedenergistics.gui.crafting_blocking_mode";
 								})))
-						.top(18)
+						.top(SLOT_SIZE)
 						.stateOverlay(0, BLOCKING_MODE[0])
 						.stateOverlay(1, BLOCKING_MODE[1])
 						.stateOverlay(2, BLOCKING_MODE[2]))
 				.child(new ItemSlot()
 						.slot(importItems, 0)
-						.size(18)
+						.size(SLOT_SIZE)
 						.tooltip(rt -> rt.addLine(IKey.lang("gregifiedenergistics.gui.item_slot"))));
 	}
 
-	public Widget<?> createPatternList(ModularPanel panel, PanelSyncManager syncHandler) {
+	public Widget<?> createPatternList(PanelSyncManager syncHandler) {
 		return null;
 	}
 
-	public Widget<?> createSubstitutionList(ModularPanel panel, PanelSyncManager syncHandler) {
+	public Widget<?> createSubstitutionList(PanelSyncManager syncHandler) {
 		DynamicSyncHandler options = new DynamicSyncHandler().widgetProvider((manager, buf) -> {
 			int count = buf.readVarInt();
 			if (count < 0 || count > buf.readableBytes())
@@ -317,8 +304,8 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 			for (int i = 0; i < count; ++i) names.add(buf.readString(32767));
 			return new Grid()
 					.minElementMargin(0)
-					.minColWidth(18)
-					.minRowHeight(18)
+					.minColWidth(SLOT_SIZE)
+					.minRowHeight(SLOT_SIZE)
 					.widthRel(1f)
 					.heightRel(1f)
 					.scrollable()
@@ -343,11 +330,10 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 			}
 		});
 		syncHandler.syncValue("substitution_list", options);
-		return Flow.column()
-				.left(7)
+		return new DynamicSyncedWidget<>()
 				.widthRel(1f)
-				.child(IKey.lang("gregifiedenergistics.gui.substitution_list").asWidget())
-				.child(new DynamicSyncedWidget<>().widthRel(1f).height(78).syncHandler(options));
+				.height(GRID_VIEWPORT_HEIGHT)
+				.syncHandler(options);
 	}
 
 	@Override

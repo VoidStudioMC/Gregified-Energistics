@@ -38,8 +38,6 @@ gregifiedenergistics.machine.me.copy_settings=Substitution settings copied to th
 gregifiedenergistics.machine.me.paste_settings=Substitution settings loaded from the Memory Card.
 
 gregifiedenergistics.gui.substitution=Substitution
-gregifiedenergistics.gui.substitution_list=Substitution list
-gregifiedenergistics.gui.pattern_list=Assembly Line patterns
 
 gregifiedenergistics.gui.buffer_contents=Buffer #%d contents
 gregifiedenergistics.gui.buffer_items=Items

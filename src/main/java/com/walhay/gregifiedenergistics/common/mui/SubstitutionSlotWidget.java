@@ -1,5 +1,10 @@
 package com.walhay.gregifiedenergistics.common.mui;
 
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.CONTENT_TOP;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.MIN_WIDTH;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.PADDING;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.SLOT_SIZE;
+
 import com.cleanroommc.modularui.api.IPanelHandler;
 import com.cleanroommc.modularui.api.UpOrDown;
 import com.cleanroommc.modularui.api.drawable.IKey;
@@ -37,7 +42,7 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 	private ItemDrawable itemPreview;
 
 	public SubstitutionSlotWidget() {
-		size(18);
+		size(SLOT_SIZE);
 		background(GTGuiTextures.SLOT);
 		this.itemPreview = new ItemDrawable();
 		overlay(itemPreview.asIcon().alignment(Alignment.CENTER));
@@ -86,13 +91,13 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 					getPanel(),
 					(parentPanel, player) -> {
 						ItemDrawable preview = new ItemDrawable();
-						return GTGuis.createPopupPanel("selector_panel_" + name, 110, 176)
+						return GTGuis.createPopupPanel("selector_panel_" + name, MIN_WIDTH, 174)
 								.child(IKey.lang("gregifiedenergistics.gui.substitution")
 										.asWidget()
 										.pos(5, 5))
 								.child(new Widget<>()
-										.size(18)
-										.top(19)
+										.size(SLOT_SIZE)
+										.top(CONTENT_TOP)
 										.tooltipAutoUpdate(true)
 										.tooltipBuilder(rt -> {
 											ItemStack selected = selectedItem();
@@ -102,7 +107,7 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 										.horizontalCenter()
 										.background(GTGuiTextures.SLOT)
 										.overlay(preview.asIcon().margin(1)))
-								.child(new CandidateList().pos(5, 41).size(100, 126));
+								.child(new CandidateList().pos(PADDING, 41).size(MIN_WIDTH - 2 * PADDING, 126));
 					},
 					true);
 		}
@@ -129,11 +134,12 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 			removeAll();
 			child(new Grid()
 					.minElementMargin(0)
-					.minColWidth(18)
-					.minRowHeight(18)
+					.minColWidth(SLOT_SIZE)
+					.minRowHeight(SLOT_SIZE)
 					.coverChildren()
+					.horizontalCenter()
 					.mapTo(
-							Math.max(1, Math.min(5, candidates.size())),
+							Math.max(1, Math.min(9, candidates.size())),
 							candidates,
 							(index, item) -> candidateButton(item)));
 			scheduleResize();
@@ -142,7 +148,7 @@ public class SubstitutionSlotWidget extends Widget<SubstitutionSlotWidget> imple
 
 	private Widget<?> candidateButton(ItemStack item) {
 		return new ButtonWidget<>()
-				.size(18)
+				.size(SLOT_SIZE)
 				.background(GTGuiTextures.SLOT)
 				.overlay(new ItemDrawable(item).asIcon().margin(1))
 				.tooltip(rt -> rt.addFromItem(item))

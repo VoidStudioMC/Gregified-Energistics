@@ -1,6 +1,11 @@
 package com.walhay.gregifiedenergistics.common.metatileentities.multiblockparts;
 
 import static com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig.MAX_SLOTS;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.CONTENT_TOP;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.INVENTORY_SPACE;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.MIN_WIDTH;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.PADDING;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.SLOT_SIZE;
 import static gregtech.api.GTValues.ZPM;
 
 import appeng.api.AEApi;
@@ -43,6 +48,7 @@ import com.walhay.gregifiedenergistics.api.capability.PatternBufferStorage;
 import com.walhay.gregifiedenergistics.api.metatileentity.MetaTileEntityCraftingProvider;
 import com.walhay.gregifiedenergistics.api.mui.DynamicItemSlot;
 import com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuiTextures;
+import com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis;
 import com.walhay.gregifiedenergistics.api.patterns.implementations.GhostCircuitPatternWrapper;
 import com.walhay.gregifiedenergistics.client.render.GregifiedEnergisticsTextures;
 import gregtech.api.capability.GregtechDataCodes;
@@ -235,9 +241,7 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 	public ModularPanel buildUI(PosGuiData guiData, PanelSyncManager syncManager, UISettings settings) {
 		syncManager.registerSlotGroup("pattern_inv", 9);
 
-		return GTGuis.createPanel(this, 199, 184)
-				.child(IKey.lang(getMetaFullName()).asWidget().pos(5, 5))
-				.child(SlotGroupWidget.playerInventory(false).left(7).bottom(7))
+		return GregifiedEnergisticsGuis.createPanel(this, MIN_WIDTH, CONTENT_TOP + 4 * SLOT_SIZE + INVENTORY_SPACE)
 				.child(SlotGroupWidget.builder()
 						.slotGroup("pattern_inv")
 						.matrix("IIIIIIIII", "IIIIIIIII", "IIIIIIIII", "IIIIIIIII")
@@ -288,12 +292,12 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 						.build()
 						.disableSortButtons()
 						.horizontalCenter()
-						.top(18))
+						.top(CONTENT_TOP))
 				.child(GTGuiTextures.getLogo(getUITheme())
 						.asWidget()
 						.size(17)
-						.right(7)
-						.bottom(7));
+						.right(PADDING)
+						.bottom(PADDING));
 	}
 
 	@Override
@@ -819,15 +823,15 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 							buf -> buf.writeInt(itemSlots).writeInt(fluidSlots).writeBoolean(waitingForRecovery));
 				}
 			});
-			int popupWidth = 198;
+			int popupWidth = MIN_WIDTH;
 			int popupHeight = 174;
-			int bodyWidth = popupWidth - 14;
+			int bodyWidth = popupWidth - 2 * PADDING;
 			int bodyHeight = popupHeight - 44;
 			int headerWidth = popupWidth - 40; // reserve the popup close button area
 
 			return (PopupPanel) GTGuis.createPopupPanel("buffer#" + index, popupWidth, popupHeight)
 					.child(Flow.row()
-							.pos(7, 5)
+							.pos(PADDING, 5)
 							.width(headerWidth)
 							.height(18)
 							.mainAxisAlignment(Alignment.MainAxis.SPACE_BETWEEN)
@@ -838,7 +842,7 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 									.slot(circuitInventory, 0)
 									.background(GTGuiTextures.SLOT, GTGuiTextures.INT_CIRCUIT_OVERLAY)))
 					.child(new DynamicSyncedWidget<>()
-							.pos(7, 28)
+							.pos(PADDING, 28)
 							.size(bodyWidth, bodyHeight)
 							.syncHandler(dsh));
 		}

@@ -1,5 +1,11 @@
 package com.walhay.gregifiedenergistics.common.metatileentities.multiblockparts;
 
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.CONTENT_TOP;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.INVENTORY_SPACE;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.MIN_WIDTH;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.PADDING;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.SLOT_SIZE;
+
 import appeng.api.networking.crafting.ICraftingPatternDetails;
 import appeng.api.networking.crafting.ICraftingProviderHelper;
 import appeng.api.storage.channels.IItemStorageChannel;
@@ -10,7 +16,6 @@ import codechicken.lib.render.CCRenderState;
 import codechicken.lib.render.pipeline.IVertexOperation;
 import codechicken.lib.vec.Matrix4;
 import com.cleanroommc.modularui.api.drawable.IKey;
-import com.cleanroommc.modularui.drawable.Icon;
 import com.cleanroommc.modularui.factory.PosGuiData;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.UISettings;
@@ -18,14 +23,13 @@ import com.cleanroommc.modularui.value.sync.BooleanSyncValue;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.cleanroommc.modularui.value.sync.SyncHandlers;
 import com.cleanroommc.modularui.widgets.ListWidget;
-import com.cleanroommc.modularui.widgets.SlotGroupWidget;
 import com.cleanroommc.modularui.widgets.ToggleButton;
-import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.layout.Grid;
 import com.cleanroommc.modularui.widgets.slot.ItemSlot;
 import com.walhay.gregifiedenergistics.api.capability.AbstractPatternItemHandler;
 import com.walhay.gregifiedenergistics.api.metatileentity.MetaTileEntityCraftingProvider;
 import com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuiTextures;
+import com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis;
 import com.walhay.gregifiedenergistics.client.render.GregifiedEnergisticsTextures;
 import gregtech.api.GTValues;
 import gregtech.api.capability.GregtechDataCodes;
@@ -41,7 +45,6 @@ import gregtech.api.metatileentity.multiblock.IMultiblockAbilityPart;
 import gregtech.api.metatileentity.multiblock.MultiblockAbility;
 import gregtech.api.metatileentity.multiblock.MultiblockControllerBase;
 import gregtech.api.mui.GTGuiTextures;
-import gregtech.api.mui.GTGuis;
 import gregtech.api.mui.widget.GhostCircuitSlotWidget;
 import gregtech.api.util.GTHashMaps;
 import gregtech.api.util.GTTransferUtils;
@@ -293,31 +296,25 @@ public class MTEMEPatternProvider extends MetaTileEntityCraftingProvider<IAEItem
 		int rowSize = (int) Math.sqrt(getInventorySize());
 		panelSyncManager.registerSlotGroup("item_inv", rowSize);
 
-		int gridHeight = rowSize * 18;
-		int viewportHeight = Math.min(126, gridHeight);
-		int backgroundWidth = Math.max(
-				9 * 18 + 18 + 14 + 5, // Player Inv width
-				rowSize * 18 + 22); // Bus Inv width and scrollbar
-		int backgroundHeight = 18 + viewportHeight + 94;
-
-		Icon detail = GTGuiTextures.BUTTON_POWER_DETAIL.asIcon().size(18, 6).marginTop(24);
+		int gridHeight = rowSize * SLOT_SIZE;
+		int viewportHeight = Math.min(7 * SLOT_SIZE, gridHeight);
+		int backgroundWidth = Math.max(MIN_WIDTH, rowSize * SLOT_SIZE + 2 * PADDING + 8);
+		int backgroundHeight = CONTENT_TOP + viewportHeight + INVENTORY_SPACE;
 
 		BooleanSyncValue workingStateValue = new BooleanSyncValue(this::isWorkingEnabled, this::setWorkingEnabled);
 		BooleanSyncValue collapseStateValue = new BooleanSyncValue(this::isAutoCollapse, this::setAutoCollapse);
 
-		return GTGuis.createPanel(this, backgroundWidth, backgroundHeight)
-				.child(IKey.lang(getMetaFullName()).asWidget().pos(5, 5))
-				.child(SlotGroupWidget.playerInventory(false).left(7).bottom(7))
+		return GregifiedEnergisticsGuis.createPanel(this, backgroundWidth, backgroundHeight)
 				.child(new ListWidget<>()
-						.top(18)
-						.width(rowSize * 18 + 8)
+						.top(CONTENT_TOP)
+						.width(rowSize * SLOT_SIZE + 8)
 						.height(viewportHeight)
 						.horizontalCenter()
 						.child(new Grid()
 								.coverChildren()
 								.minElementMargin(0, 0)
-								.minColWidth(18)
-								.minRowHeight(18)
+								.minColWidth(SLOT_SIZE)
+								.minRowHeight(SLOT_SIZE)
 								.horizontalCenter()
 								.mapTo(
 										rowSize,
@@ -332,26 +329,10 @@ public class MTEMEPatternProvider extends MetaTileEntityCraftingProvider<IAEItem
 																gtHandler.onContentsChanged(index);
 															}
 														})))))
-				.child(Flow.column()
-						.pos(backgroundWidth - 7 - 18, backgroundHeight - 18 * 4 - 7 - 5)
-						.width(18)
-						.height(18 * 4 + 5)
+				.child(GregifiedEnergisticsGuis.buttonColumn()
+						.child(GregifiedEnergisticsGuis.workingButton(workingStateValue))
 						.child(new ToggleButton()
-								.name("power_button")
-								.size(18)
-								.disableHoverBackground()
-								.overlay(true, detail, GTGuiTextures.BUTTON_POWER[1])
-								.overlay(false, detail, GTGuiTextures.BUTTON_POWER[0])
-								.value(workingStateValue)
-								.tooltipAutoUpdate(true)
-								.tooltipBuilder(t -> t.addLine(IKey.lang(
-										workingStateValue.getBoolValue()
-												? "gregifiedenergistics.gui.working.enabled"
-												: "gregifiedenergistics.gui.working.disabled")))
-								.marginTop(4)
-								.top(18 * 3 + 5))
-						.child(new ToggleButton()
-								.top(18 * 2)
+								.top(2 * SLOT_SIZE)
 								.value(collapseStateValue)
 								.overlay(GTGuiTextures.BUTTON_AUTO_COLLAPSE)
 								.tooltipAutoUpdate(true)
@@ -361,7 +342,7 @@ public class MTEMEPatternProvider extends MetaTileEntityCraftingProvider<IAEItem
 												: IKey.lang("gregtech.gui.item_auto_collapse.tooltip.disabled"))))
 						.child(new GhostCircuitSlotWidget()
 								.slot(circuitInventory, 0)
-								.top(18)
+								.top(SLOT_SIZE)
 								.background(GTGuiTextures.SLOT, GTGuiTextures.INT_CIRCUIT_OVERLAY))
 						.child(new ItemSlot()
 								.slot(SyncHandlers.itemSlot(patternHandler, 0)
