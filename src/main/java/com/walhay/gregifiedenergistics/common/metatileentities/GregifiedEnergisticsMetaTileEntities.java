@@ -16,7 +16,7 @@ public class GregifiedEnergisticsMetaTileEntities {
 	public static MTEMEAssemblyLineBus ME_ASSEMBLY_LINE_BUS;
 	public static MTEMEAssemblyLineOpticalBus ME_ASSEMBLY_LINE_OPTICAL_BUS;
 	public static MTEMEPatternBuffer ME_PATTERN_BUFFER;
-	public static MTEMEPatternProvider[] ME_PATTERN_PROVIDER = new MTEMEPatternProvider[5];
+	public static MTEMEPatternProvider[] ME_PATTERN_PROVIDER = new MTEMEPatternProvider[GTValues.UHV - GTValues.IV + 1];
 
 	public static void init() {
 		ME_ASSEMBLY_LINE_BUS =
@@ -24,7 +24,7 @@ public class GregifiedEnergisticsMetaTileEntities {
 		ME_ASSEMBLY_LINE_OPTICAL_BUS = registerMetaTileEntity(
 				autoId(), new MTEMEAssemblyLineOpticalBus(location("me_assembly_line_optical_bus")));
 		ME_PATTERN_BUFFER = registerMetaTileEntity(autoId(), new MTEMEPatternBuffer(location("me_pattern_buffer")));
-		for (int i = 0; i <= GTValues.UHV - GTValues.IV; ++i) {
+		for (int i = 0; i < ME_PATTERN_PROVIDER.length; ++i) {
 			int tier = GTValues.IV + i;
 			ME_PATTERN_PROVIDER[i] = registerMetaTileEntity(
 					autoId(), new MTEMEPatternProvider(location("me_pattern_provider_" + GTValues.VN[tier]), tier));
