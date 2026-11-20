@@ -241,7 +241,8 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 	public ModularPanel buildUI(PosGuiData guiData, PanelSyncManager syncManager, UISettings settings) {
 		syncManager.registerSlotGroup("pattern_inv", 9);
 
-		return GregifiedEnergisticsGuis.createPanel(this, MIN_WIDTH, CONTENT_TOP + 4 * SLOT_SIZE + INVENTORY_SPACE)
+		return GregifiedEnergisticsGuis.createPanel(
+				this, GTGuis.DEFAULT_WIDTH, CONTENT_TOP + 4 * SLOT_SIZE + INVENTORY_SPACE)
 				.child(SlotGroupWidget.builder()
 						.slotGroup("pattern_inv")
 						.matrix("IIIIIIIII", "IIIIIIIII", "IIIIIIIII", "IIIIIIIII")
@@ -292,12 +293,7 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 						.build()
 						.disableSortButtons()
 						.horizontalCenter()
-						.top(CONTENT_TOP))
-				.child(GTGuiTextures.getLogo(getUITheme())
-						.asWidget()
-						.size(17)
-						.right(PADDING)
-						.bottom(PADDING));
+						.top(CONTENT_TOP));
 	}
 
 	@Override
