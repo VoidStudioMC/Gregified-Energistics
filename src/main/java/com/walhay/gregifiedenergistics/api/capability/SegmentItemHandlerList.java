@@ -2,8 +2,6 @@ package com.walhay.gregifiedenergistics.api.capability;
 
 import com.github.bsideup.jabel.Desugar;
 import gregtech.api.capability.impl.ItemHandlerList;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -21,7 +19,6 @@ import net.minecraftforge.items.IItemHandlerModifiable;
 public class SegmentItemHandlerList implements IItemHandlerModifiable {
 
 	private final List<IItemHandler> handlers = new ArrayList<>();
-	private final IntList prefix = new IntArrayList();
 
 	public SegmentItemHandlerList(IItemHandler... handlers) {
 		for (IItemHandler handler : handlers) {
@@ -35,64 +32,29 @@ public class SegmentItemHandlerList implements IItemHandlerModifiable {
 		handlers.stream().filter(Objects::nonNull).forEach(this::addHandler);
 	}
 
-	private static int upperBound(IntList prefix, int x) {
-		int lo = 0, hi = prefix.size();
-		while (lo < hi) {
-			int mid = (lo + hi) >>> 1;
-			if (prefix.get(mid) <= x) {
-				lo = mid + 1;
-			} else {
-				hi = mid;
-			}
-		}
-		return lo;
-	}
-
 	public void addHandler(IItemHandler handler) {
 		Objects.requireNonNull(handler, "handler");
 		if (handlers.contains(handler)) return;
 
 		handlers.add(handler);
-		refreshHandlerSizes();
-	}
-
-	/**
-	 * Item handlers used by the pattern buffer can change their slot count after this list is created. Rebuild the
-	 * cached prefix before each operation so the aggregate always reflects the current handler sizes.
-	 */
-	private void refreshHandlerSizes() {
-		int total = 0;
-		int index = 0;
-		for (IItemHandler handler : handlers) {
-			total += handler.getSlots();
-			if (index < prefix.size()) {
-				prefix.set(index, total);
-			} else {
-				prefix.add(total);
-			}
-			index++;
-		}
-		while (prefix.size() > handlers.size()) {
-			prefix.remove(prefix.size() - 1);
-		}
 	}
 
 	protected HandlerEntry getHandlerByGlobalIndex(int index) {
-		refreshHandlerSizes();
-		int totalSlots = prefix.isEmpty() ? 0 : prefix.get(prefix.size() - 1);
-		if (index < 0 || index >= totalSlots) return new HandlerEntry(null, 0);
-
-		int handlerIndex = upperBound(prefix, index);
-
-		if (handlerIndex >= handlers.size()) return new HandlerEntry(null, 0);
-
-		return new HandlerEntry(handlers.get(handlerIndex), handlerIndex == 0 ? 0 : prefix.get(handlerIndex - 1));
+		if (index < 0) return new HandlerEntry(null, 0);
+		int offset = 0;
+		int localSlot = index;
+		for (IItemHandler handler : handlers) {
+			int slots = handler.getSlots();
+			if (localSlot < slots) return new HandlerEntry(handler, offset);
+			localSlot -= slots;
+			offset += slots;
+		}
+		return new HandlerEntry(null, 0);
 	}
 
 	@Override
 	public int getSlots() {
-		refreshHandlerSizes();
-		return prefix.isEmpty() ? 0 : prefix.get(prefix.size() - 1);
+		return handlers.stream().mapToInt(IItemHandler::getSlots).sum();
 	}
 
 	@Override
@@ -129,7 +91,7 @@ public class SegmentItemHandlerList implements IItemHandlerModifiable {
 	public void setStackInSlot(int slot, ItemStack stack) {
 		HandlerEntry entry = getHandlerByGlobalIndex(slot);
 
-		if (entry.handler != null && entry.handler instanceof IItemHandlerModifiable modifiable) {
+		if (entry.handler instanceof IItemHandlerModifiable modifiable) {
 			modifiable.setStackInSlot(slot - entry.index, stack);
 		} else if (entry.handler != null) {
 			throw new UnsupportedOperationException("Delegate does not support assigning slot contents");
