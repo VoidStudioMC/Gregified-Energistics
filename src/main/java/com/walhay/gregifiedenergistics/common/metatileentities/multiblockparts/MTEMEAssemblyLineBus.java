@@ -1,16 +1,15 @@
 package com.walhay.gregifiedenergistics.common.metatileentities.multiblockparts;
 
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.GRID_VIEWPORT_HEIGHT;
+import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.SLOT_SIZE;
 import static gregtech.api.GTValues.LuV;
 
 import appeng.api.networking.crafting.ICraftingPatternDetails;
 import appeng.items.misc.ItemEncodedPattern;
-import com.cleanroommc.modularui.api.drawable.IKey;
-import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.cleanroommc.modularui.value.sync.SyncHandlers;
 import com.cleanroommc.modularui.widget.Widget;
-import com.cleanroommc.modularui.widgets.SlotGroupWidget;
-import com.cleanroommc.modularui.widgets.layout.Flow;
+import com.cleanroommc.modularui.widgets.layout.Grid;
 import com.cleanroommc.modularui.widgets.slot.ItemSlot;
 import com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig;
 import com.walhay.gregifiedenergistics.api.capability.AbstractPatternItemHandler;
@@ -37,7 +36,7 @@ public class MTEMEAssemblyLineBus extends MTEAbstractAssemblyLineBus {
 	public static final String PATTERN_INVENTORY_TAG = "PatternInventory";
 
 	private final DataStickHandler patternHandler =
-			new DataStickHandler(GregifiedEnergisticsConfig.machineConfig.patternHandlerSize);
+			new DataStickHandler(GregifiedEnergisticsConfig.machineConfig.getPatternHandlerSize());
 
 	public MTEMEAssemblyLineBus(ResourceLocation metaTileEntityId) {
 		super(metaTileEntityId, LuV);
@@ -58,36 +57,31 @@ public class MTEMEAssemblyLineBus extends MTEAbstractAssemblyLineBus {
 
 	@Override
 	@SuppressWarnings("UnstableApiUsage")
-	public Widget<?> createPatternList(ModularPanel panel, PanelSyncManager syncHandler) {
-		panel.child(SlotGroupWidget.playerInventory(false).left(7).bottom(7));
-		syncHandler.registerSlotGroup("item_inv", 4);
-
-		return Flow.column()
+	public Widget<?> createPatternList(PanelSyncManager syncHandler) {
+		int columns = Math.min(patternHandler.getSlots(), GregifiedEnergisticsConfig.guiConfig.getPatternColumns());
+		syncHandler.registerSlotGroup("item_inv", columns);
+		return new Grid()
 				.name("pattern list")
-				.widthRel(0.9f)
+				.widthRel(1f)
+				.height(GRID_VIEWPORT_HEIGHT)
+				.scrollable()
+				.minElementMargin(0)
+				.minColWidth(SLOT_SIZE)
+				.minRowHeight(SLOT_SIZE)
 				.horizontalCenter()
-				.coverChildrenHeight()
-				.child(IKey.lang("gregifiedenergistics.gui.pattern_list").asWidget())
-				.child(SlotGroupWidget.builder()
-						.slotGroup("item_inv")
-						.row("IIII")
-						.row("IIII")
-						.row("IIII")
-						.row("IIII")
-						.key(
-								'I',
-								index -> new ItemSlot()
-										.slot(SyncHandlers.itemSlot(patternHandler, index)
-												.changeListener((newItem, onlyAmountChanged, client, init) ->
-														patternHandler.onContentsChanged(index)))
-										.background(
-												GTGuiTextures.SLOT,
-												GregifiedEnergisticsGuiTextures.PATTERN_OVERLAY
-														.asIcon()
-														.size(16)))
-						.build()
-						.coverChildren()
-						.horizontalCenter());
+				.mapTo(
+						columns,
+						patternHandler.getSlots(),
+						index -> new ItemSlot()
+								.slot(SyncHandlers.itemSlot(patternHandler, index)
+										.slotGroup("item_inv")
+										.changeListener((newItem, onlyAmountChanged, client, init) ->
+												patternHandler.onContentsChanged(index)))
+								.background(
+										GTGuiTextures.SLOT,
+										GregifiedEnergisticsGuiTextures.PATTERN_OVERLAY
+												.asIcon()
+												.size(16)));
 	}
 
 	@Override

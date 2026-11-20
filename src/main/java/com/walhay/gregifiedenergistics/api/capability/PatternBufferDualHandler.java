@@ -3,66 +3,41 @@ package com.walhay.gregifiedenergistics.api.capability;
 import gregtech.api.capability.DualHandler;
 import gregtech.api.capability.IMultipleTankHandler;
 import gregtech.api.capability.impl.GhostCircuitItemStackHandler;
-import gregtech.api.capability.impl.ItemHandlerList;
-import java.lang.reflect.Field;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import net.minecraft.item.ItemStack;
 import net.minecraftforge.items.IItemHandlerModifiable;
 import org.jetbrains.annotations.NotNull;
 
 /** DualHandlerPattern */
 public class PatternBufferDualHandler extends DualHandler {
 
-	private final IItemHandlerModifiable itemInventory;
-	private final GhostCircuitItemStackHandler circuitInventory;
-
-	private static final Field UNWRAPPED;
-
-	static {
-		try {
-			UNWRAPPED = DualHandler.class.getDeclaredField("unwrapped");
-			UNWRAPPED.setAccessible(true);
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-	}
-
-	@Override
-	public @NotNull ItemStack getStackInSlot(int slot) {
-		if (slot < 0 || slot >= getSlots()) return ItemStack.EMPTY;
-
-		return super.getStackInSlot(slot);
-	}
+	private List<IMultipleTankHandler.ITankEntry> tanks = Collections.emptyList();
 
 	public PatternBufferDualHandler(
 			@NotNull IItemHandlerModifiable itemDelegate,
 			GhostCircuitItemStackHandler circuitInventory,
 			@NotNull IMultipleTankHandler fluidTank) {
-		super(new ItemHandlerList(Arrays.asList(itemDelegate, circuitInventory)), fluidTank, false);
-		this.itemInventory = itemDelegate;
-		this.circuitInventory = circuitInventory;
+		super(new SegmentItemHandlerList(itemDelegate, circuitInventory), fluidTank, false);
+		setFluidDelegate(fluidTank);
 	}
 
 	public void setFluidDelegate(IMultipleTankHandler fluidTank) {
 		this.fluidDelegate = fluidTank;
-
-		try {
-			@SuppressWarnings("unchecked")
-			List<IMultipleTankHandler.ITankEntry> unwrapped =
-					(List<IMultipleTankHandler.ITankEntry>) UNWRAPPED.get(this);
-
-			unwrapped.clear();
-
-			for (var entry : this.fluidDelegate.getFluidTanks()) {
-				unwrapped.add(entry instanceof DualEntry dualEntry ? dualEntry : new DualEntry(this, entry));
-			}
-		} catch (Exception e) {
-			throw new RuntimeException(e);
+		List<IMultipleTankHandler.ITankEntry> replacement = new ArrayList<>(fluidTank.getTanks());
+		for (var entry : fluidTank.getFluidTanks()) {
+			replacement.add(new DualEntry(this, entry));
 		}
+		this.tanks = Collections.unmodifiableList(replacement);
 	}
 
-	public void onResize() {
-		this.itemDelegate = new ItemHandlerList(Arrays.asList(itemInventory, circuitInventory));
+	@Override
+	public @NotNull List<IMultipleTankHandler.ITankEntry> getFluidTanks() {
+		return tanks;
+	}
+
+	@Override
+	public @NotNull IMultipleTankHandler.ITankEntry getTankAt(int index) {
+		return tanks.get(index);
 	}
 }

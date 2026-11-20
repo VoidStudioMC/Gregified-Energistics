@@ -7,15 +7,13 @@ import gregtech.api.recipes.Recipe;
 import gregtech.common.metatileentities.multi.multiblockpart.MetaTileEntityMultiblockNotifiablePart;
 import gregtech.common.metatileentities.multi.multiblockpart.MetaTileEntityOpticalDataHatch;
 import gregtech.common.pipelike.optical.tile.TileEntityOpticalPipe;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Set;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.capabilities.Capability;
 import org.spongepowered.asm.mixin.Final;
-import org.spongepowered.asm.mixin.Implements;
-import org.spongepowered.asm.mixin.Interface;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -24,7 +22,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(MetaTileEntityOpticalDataHatch.class)
-@Implements(@Interface(iface = IOpticalNetRecipeHandler.class, prefix = "dataHandler$"))
 public abstract class OpticalDataHatchMixin extends MetaTileEntityMultiblockNotifiablePart
 		implements IOpticalNetRecipeHandler {
 
@@ -40,7 +37,15 @@ public abstract class OpticalDataHatchMixin extends MetaTileEntityMultiblockNoti
 	public void setFrontFacing(EnumFacing facing) {
 		EnumFacing oldFacing = this.frontFacing;
 		super.setFrontFacing(facing);
-		if (isTransmitter) onRecipesUpdatePipe(new ArrayList<>(), oldFacing);
+		if (getWorld() != null && !getWorld().isRemote) {
+			for (EnumFacing side : new EnumFacing[] {oldFacing, facing}) {
+				TileEntity tile = getNeighbor(side);
+				if (tile instanceof TileEntityOpticalPipe pipe) {
+					var net = pipe.getOpticalPipeNet();
+					if (net != null) net.onNeighbourUpdate(getPos());
+				}
+			}
+		}
 		onRecipesUpdate();
 	}
 
@@ -52,8 +57,8 @@ public abstract class OpticalDataHatchMixin extends MetaTileEntityMultiblockNoti
 	}
 
 	@Override
-	@Unique public Collection<Recipe> getRecipes(Collection<INetRecipeHandler> seen) {
-		seen.add(this);
+	@Unique public Collection<Recipe> getRecipes(Set<INetRecipeHandler> seen) {
+		if (!seen.add(this)) return null;
 
 		if (isAttachedToMultiBlock()) {
 			if (isTransmitter) {
@@ -79,8 +84,8 @@ public abstract class OpticalDataHatchMixin extends MetaTileEntityMultiblockNoti
 		return null;
 	}
 
-	private void onRecipesUpdatePipe(Collection<INetRecipeHandler> seen, EnumFacing facing) {
-		if (getWorld() == null) return;
+	private void onRecipesUpdatePipe(Set<INetRecipeHandler> seen, EnumFacing facing) {
+		if (getWorld() == null || getWorld().isRemote) return;
 		TileEntity te = getWorld().getTileEntity(getPos().offset(facing));
 
 		if (te instanceof TileEntityOpticalPipe pipe) {
@@ -92,8 +97,8 @@ public abstract class OpticalDataHatchMixin extends MetaTileEntityMultiblockNoti
 	}
 
 	@Override
-	@Unique public void onRecipesUpdate(Collection<INetRecipeHandler> seen) {
-		seen.add(this);
+	@Unique public void onRecipesUpdate(Set<INetRecipeHandler> seen) {
+		if (!seen.add(this)) return;
 
 		if (isTransmitter) {
 			onRecipesUpdatePipe(seen, getFrontFacing());

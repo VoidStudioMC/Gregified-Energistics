@@ -6,69 +6,77 @@ import com.walhay.gregifiedenergistics.api.patterns.ISubstitutionNotifiable;
 import com.walhay.gregifiedenergistics.api.patterns.ISubstitutionStorage;
 import gregtech.api.metatileentity.MTETrait;
 import gregtech.api.metatileentity.MetaTileEntity;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.IOException;
 import java.util.Collection;
-import java.util.Map;
-import net.minecraft.nbt.NBTBase;
+import java.util.List;
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
 import net.minecraft.network.PacketBuffer;
 import net.minecraftforge.common.capabilities.Capability;
-import net.minecraftforge.common.util.Constants.NBT;
 import org.jetbrains.annotations.NotNull;
 
 public class SubstitutionStorage extends MTETrait implements ISubstitutionStorage {
-
 	public static final String STORAGE_TAG = "SubstitutionStorage";
-
-	private final Object2IntOpenHashMap<String> substitutionMap = new Object2IntOpenHashMap<>();
-	private ISubstitutionNotifiable notifiable;
+	private final SubstitutionData data = new SubstitutionData();
+	private long syncedRevision = -1;
 
 	public SubstitutionStorage(MetaTileEntity mte) {
 		super(mte);
-		if (mte instanceof ISubstitutionNotifiable) this.notifiable = (ISubstitutionNotifiable) mte;
-	}
-
-	protected void onSubstitutionChange() {
-		if (notifiable != null) notifiable.notifySubstitutionChange();
 	}
 
 	@Override
 	public int getOption(String name) {
-		if (!substitutionMap.containsKey(name)) {
-			substitutionMap.put(name, 0);
-			writeCustomData(
-					GregifiedEnergisticsDataCodes.SUBSTITUTION_CHANGE,
-					buf -> buf.writeString(name).writeInt(0));
-			return 0;
-		}
-
-		return substitutionMap.getInt(name);
+		return data.getOption(name);
 	}
 
 	@Override
 	public void setOption(String name, int option) {
-		if (substitutionMap.getInt(name) != option) {
-			substitutionMap.put(name, option);
-			writeCustomData(
-					GregifiedEnergisticsDataCodes.SUBSTITUTION_CHANGE,
-					buf -> buf.writeString(name).writeInt(option));
-			onSubstitutionChange();
+		List<ItemStack> candidates = data.getCandidates(name);
+		if (option < 0 || option >= candidates.size()) return;
+		long revision = data.getRevision();
+		data.setOption(name, option);
+		if (revision != data.getRevision()) {
+			changed();
+			if (metaTileEntity instanceof ISubstitutionNotifiable notifiable) notifiable.notifySubstitutionChange();
 		}
+	}
+
+	@Override
+	public void registerCandidates(String name, ItemStack[] candidates) {
+		long revision = data.getRevision();
+		data.registerCandidates(name, candidates);
+		if (revision != data.getRevision()) changed();
+	}
+
+	@Override
+	public List<ItemStack> getCandidates(String name) {
+		return data.getCandidates(name);
 	}
 
 	@Override
 	public Collection<String> getOptions() {
-		return substitutionMap.keySet();
+		return data.getOptions();
+	}
+
+	private void changed() {
+		if (metaTileEntity.getWorld() != null && !metaTileEntity.getWorld().isRemote) metaTileEntity.markDirty();
+	}
+
+	@Override
+	public void update() {
+		if (metaTileEntity.getWorld() == null
+				|| metaTileEntity.getWorld().isRemote
+				|| syncedRevision == data.getRevision()) return;
+		syncedRevision = data.getRevision();
+		NBTTagCompound tag = data.serializeSyncNBT();
+		writeCustomData(GregifiedEnergisticsDataCodes.SUBSTITUTION_CHANGE, buf -> buf.writeCompoundTag(tag));
 	}
 
 	@Override
 	public <T> T getCapability(Capability<T> capability) {
-		if (capability == GregifiedEnergisticsCapabilities.CAPABILITY_SUBSTITUTION_STORAGE) {
-			return GregifiedEnergisticsCapabilities.CAPABILITY_SUBSTITUTION_STORAGE.cast(this);
-		}
-		return null;
+		return capability == GregifiedEnergisticsCapabilities.CAPABILITY_SUBSTITUTION_STORAGE
+				? GregifiedEnergisticsCapabilities.CAPABILITY_SUBSTITUTION_STORAGE.cast(this)
+				: null;
 	}
 
 	@Override
@@ -78,62 +86,36 @@ public class SubstitutionStorage extends MTETrait implements ISubstitutionStorag
 
 	@Override
 	public NBTTagCompound serializeNBT() {
-		NBTTagCompound compound = new NBTTagCompound();
-		NBTTagList list = new NBTTagList();
-		for (Map.Entry<String, Integer> entry : substitutionMap.entrySet()) {
-			NBTTagCompound tag = new NBTTagCompound();
-
-			tag.setString("Ingredient", entry.getKey());
-			tag.setInteger("Option", entry.getValue());
-
-			list.appendTag(tag);
-		}
-
-		compound.setTag("Data", list);
-
-		return compound;
+		return data.serializeNBT();
 	}
 
 	@Override
 	public void deserializeNBT(NBTTagCompound compound) {
-		NBTTagList nbt = compound.getTagList("Data", NBT.TAG_COMPOUND);
-		for (NBTBase base : nbt) {
-			if (base instanceof NBTTagCompound tag) {
-				String key = tag.getString("Ingredient");
-				int option = tag.getInteger("Option");
-
-				substitutionMap.put(key, option);
-			}
-		}
+		data.deserializeNBT(compound);
+		changed();
 	}
 
 	@Override
 	public void writeInitialSyncData(@NotNull PacketBuffer buf) {
-		super.writeInitialSyncData(buf);
-		buf.writeCompoundTag(serializeNBT());
+		buf.writeCompoundTag(data.serializeSyncNBT());
 	}
 
 	@Override
 	public void receiveInitialSyncData(@NotNull PacketBuffer buf) {
-		super.receiveInitialSyncData(buf);
-		try {
-			NBTTagCompound nbt = buf.readCompoundTag();
-
-			if (nbt == null) return;
-
-			deserializeNBT(nbt);
-		} catch (IOException ignored) {
-		}
+		readData(buf);
 	}
 
 	@Override
 	public void receiveCustomData(int discriminator, @NotNull PacketBuffer buf) {
-		super.receiveCustomData(discriminator, buf);
-		if (discriminator == GregifiedEnergisticsDataCodes.SUBSTITUTION_CHANGE) {
-			String name = buf.readString(64);
-			int option = buf.readInt();
+		if (discriminator == GregifiedEnergisticsDataCodes.SUBSTITUTION_CHANGE) readData(buf);
+	}
 
-			substitutionMap.put(name, option);
+	private void readData(PacketBuffer buf) {
+		try {
+			NBTTagCompound tag = buf.readCompoundTag();
+			if (tag != null) data.deserializeSyncNBT(tag);
+		} catch (IOException exception) {
+			throw new IllegalArgumentException("Invalid substitution data", exception);
 		}
 	}
 }

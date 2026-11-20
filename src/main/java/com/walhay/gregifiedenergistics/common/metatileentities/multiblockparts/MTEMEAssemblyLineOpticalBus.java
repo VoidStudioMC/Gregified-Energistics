@@ -14,12 +14,16 @@ import com.walhay.gregifiedenergistics.api.capability.IOpticalNetRecipeHandler;
 import com.walhay.gregifiedenergistics.api.patterns.implementations.RecipePatternHelper;
 import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.api.metatileentity.interfaces.IGregTechTileEntity;
+import gregtech.api.metatileentity.multiblock.MultiblockControllerBase;
 import gregtech.api.recipes.Recipe;
 import gregtech.client.renderer.texture.Textures;
 import gregtech.common.pipelike.optical.tile.TileEntityOpticalPipe;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
@@ -39,6 +43,8 @@ public class MTEMEAssemblyLineOpticalBus extends MTEAbstractAssemblyLineBus impl
 
 	private final List<RecipePatternHelper> patterns = new ArrayList<>();
 	private EnumFacing opticalFacing = EnumFacing.DOWN;
+	private boolean patternDataDirty = true;
+	private boolean updatingPatternData;
 
 	public MTEMEAssemblyLineOpticalBus(ResourceLocation metaTileEntityId) {
 		super(metaTileEntityId, ZPM);
@@ -65,9 +71,12 @@ public class MTEMEAssemblyLineOpticalBus extends MTEAbstractAssemblyLineBus impl
 	public boolean onScrewdriverClick(
 			EntityPlayer playerIn, EnumHand hand, EnumFacing facing, CuboidRayTraceResult hitResult) {
 		if (opticalFacing != facing) {
-			opticalFacing = facing;
-			writeCustomData(CHANGE_OPTICAL_SIDE, buf -> buf.writeEnumValue(opticalFacing));
-			updatePatternData();
+			if (getWorld() != null && !getWorld().isRemote) {
+				opticalFacing = facing;
+				markDirty();
+				writeCustomData(CHANGE_OPTICAL_SIDE, buf -> buf.writeEnumValue(opticalFacing));
+				patternDataDirty = true;
+			}
 			return true;
 		}
 
@@ -77,7 +86,7 @@ public class MTEMEAssemblyLineOpticalBus extends MTEAbstractAssemblyLineBus impl
 	@Override
 	public void setFrontFacing(EnumFacing frontFacing) {
 		super.setFrontFacing(frontFacing);
-		updatePatternData();
+		patternDataDirty = true;
 	}
 
 	@Override
@@ -90,7 +99,9 @@ public class MTEMEAssemblyLineOpticalBus extends MTEAbstractAssemblyLineBus impl
 	@Override
 	public void readFromNBT(NBTTagCompound data) {
 		super.readFromNBT(data);
-		opticalFacing = EnumFacing.byName(data.getString(OPTICAL_FACING_TAG));
+		EnumFacing savedFacing = EnumFacing.byName(data.getString(OPTICAL_FACING_TAG));
+		opticalFacing = savedFacing == null ? EnumFacing.DOWN : savedFacing;
+		patternDataDirty = true;
 	}
 
 	@Override
@@ -128,39 +139,74 @@ public class MTEMEAssemblyLineOpticalBus extends MTEAbstractAssemblyLineBus impl
 		Textures.OPTICAL_DATA_ACCESS_HATCH.renderSided(opticalFacing, renderState, translation, pipeline);
 	}
 
-	private void updatePatternData() {
-		if (!isAttachedToMultiBlock()) {
-			clearPatternData();
-			return;
-		}
+	@Override
+	public void update() {
+		super.update();
+		if (getWorld() == null || getWorld().isRemote || !patternDataDirty) return;
+		patternDataDirty = false;
+		updatePatternData();
+	}
 
-		TileEntity te = getWorld().getTileEntity(getPos().offset(opticalFacing));
-		if (te instanceof TileEntityOpticalPipe) {
-			INetRecipeHandler data = te.getCapability(
-					GregifiedEnergisticsCapabilities.CAPABILITY_RECIPE_HANDLER, opticalFacing.getOpposite());
+	@Override
+	public void addToMultiBlock(MultiblockControllerBase controller) {
+		super.addToMultiBlock(controller);
+		// Defer until the controller has completed forming and registered all of its abilities.
+		patternDataDirty = true;
+	}
 
-			if (data == null) {
-				clearPatternData();
-				return;
-			}
-
-			var recipes = data.getRecipes();
-			if (recipes == null || recipes.isEmpty()) {
-				clearPatternData();
-				return;
-			}
-
-			patterns.clear();
-			recipes.stream().map(RecipePatternHelper::new).forEach(pattern -> {
-				pattern.injectSubstitutions(substitutionStorage);
-				patterns.add(pattern);
-			});
-
-			notifyPatternChange();
-			return;
-		}
-
+	@Override
+	public void removeFromMultiBlock(MultiblockControllerBase controller) {
+		super.removeFromMultiBlock(controller);
 		clearPatternData();
+		patternDataDirty = true;
+	}
+
+	private void updatePatternData() {
+		if (getWorld() == null || getWorld().isRemote || updatingPatternData) return;
+		updatingPatternData = true;
+		try {
+			if (!isAttachedToMultiBlock()) {
+				clearPatternData();
+				return;
+			}
+
+			TileEntity te = getWorld().getTileEntity(getPos().offset(opticalFacing));
+			if (te instanceof TileEntityOpticalPipe) {
+				INetRecipeHandler data = te.getCapability(
+						GregifiedEnergisticsCapabilities.CAPABILITY_RECIPE_HANDLER, opticalFacing.getOpposite());
+
+				if (data == null) {
+					clearPatternData();
+					return;
+				}
+
+				Set<INetRecipeHandler> seen = INetRecipeHandler.newTraversal();
+				Collection<Recipe> recipes = data.getRecipes(seen);
+				if (recipes == null) recipes = Collections.emptyList();
+
+				// Recipe.equals only compares inputs; registered recipes are immutable.
+				Set<Recipe> available = Collections.newSetFromMap(new IdentityHashMap<>());
+				available.addAll(recipes);
+				if (available.size() == patterns.size()
+						&& patterns.stream().allMatch(pattern -> available.contains(pattern.getRecipe()))) return;
+
+				patterns.clear();
+				for (Recipe recipe : recipes) {
+					if (!available.remove(recipe)) continue;
+					RecipePatternHelper pattern = new RecipePatternHelper(recipe);
+					pattern.injectSubstitutions(substitutionStorage);
+					patterns.add(pattern);
+				}
+
+				notifyPatternChange();
+				seen.forEach(INetRecipeHandler::onRecipesTransferred);
+				return;
+			}
+
+			clearPatternData();
+		} finally {
+			updatingPatternData = false;
+		}
 	}
 
 	private void clearPatternData() {
@@ -176,14 +222,14 @@ public class MTEMEAssemblyLineOpticalBus extends MTEAbstractAssemblyLineBus impl
 	}
 
 	@Override
-	public void onRecipesUpdate(Collection<INetRecipeHandler> seen) {
-		seen.add(this);
-		updatePatternData();
+	public void onRecipesUpdate(Set<INetRecipeHandler> seen) {
+		if (!seen.add(this)) return;
+		patternDataDirty = true;
 	}
 
 	@Override
-	public Collection<Recipe> getRecipes(Collection<INetRecipeHandler> seen) {
-		seen.add(this);
+	public Collection<Recipe> getRecipes(Set<INetRecipeHandler> seen) {
+		if (!seen.add(this)) return null;
 		return null;
 	}
 

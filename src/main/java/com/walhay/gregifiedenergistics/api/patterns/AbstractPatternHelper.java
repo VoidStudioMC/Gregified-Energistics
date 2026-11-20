@@ -7,10 +7,8 @@ import appeng.api.storage.channels.IFluidStorageChannel;
 import appeng.api.storage.channels.IItemStorageChannel;
 import appeng.api.storage.data.IAEFluidStack;
 import appeng.api.storage.data.IAEItemStack;
-import com.walhay.gregifiedenergistics.api.util.GTHelperUtility;
 import gregtech.api.recipes.Recipe;
 import gregtech.api.recipes.ingredients.GTRecipeInput;
-import java.lang.ref.WeakReference;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -18,6 +16,7 @@ import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
 import net.minecraftforge.fluids.FluidStack;
+import net.minecraftforge.oredict.OreDictionary;
 
 public abstract class AbstractPatternHelper implements IProvidablePattern, ISubstitutionHandler {
 
@@ -30,32 +29,51 @@ public abstract class AbstractPatternHelper implements IProvidablePattern, ISubs
 	protected IAEFluidStack[] fluidInputs;
 	private int priority = 0;
 	private final Map<Integer, GTRecipeInput> subMap = new HashMap<>();
-	protected WeakReference<ISubstitutionStorage> substitutionStorage = new WeakReference<>(null);
+	private String substitutionPrefix;
+	protected ISubstitutionStorage substitutionStorage;
+	protected boolean validRecipe = true;
 
 	protected void parseRecipe(Recipe recipe) {
-		inputs = recipe.getInputs().stream()
-				.map(input -> input.getInputStacks()[0])
-				.map(ItemStack::copy)
-				.map(itemChannel::createStack)
-				.toArray(IAEItemStack[]::new);
-
+		validRecipe = true;
+		subMap.clear();
+		ItemStack output = recipe.getOutputs().isEmpty()
+				? ItemStack.EMPTY
+				: recipe.getOutputs().get(0);
+		substitutionPrefix = "input:" + output.getItem().getRegistryName() + "@" + output.getMetadata() + ":";
+		inputs = new IAEItemStack[recipe.getInputs().size()];
+		for (int i = 0; i < inputs.length; ++i) {
+			GTRecipeInput input = recipe.getInputs().get(i);
+			ItemStack[] raw = input == null ? null : input.getInputStacks();
+			ItemStack[] candidates = raw == null
+					? new ItemStack[0]
+					: java.util.Arrays.stream(raw)
+							.filter(stack -> stack != null && !stack.isEmpty())
+							.toArray(ItemStack[]::new);
+			if (candidates.length == 0) {
+				validRecipe = false;
+				continue;
+			}
+			ItemStack stack = candidates[0].copy();
+			stack.setCount(input.getAmount());
+			inputs[i] = itemChannel.createStack(stack);
+			if (candidates.length > 1) subMap.put(i, input);
+		}
 		outputs = recipe.getOutputs().stream()
+				.filter(stack -> stack != null && !stack.isEmpty())
 				.map(ItemStack::copy)
 				.map(itemChannel::createStack)
 				.toArray(IAEItemStack[]::new);
-
 		fluidInputs = recipe.getFluidInputs().stream()
 				.map(GTRecipeInput::getInputFluidStack)
+				.filter(stack -> stack != null && stack.amount > 0)
 				.map(FluidStack::copy)
 				.map(fluidChannel::createStack)
 				.toArray(IAEFluidStack[]::new);
+		if (outputs.length == 0 || fluidInputs.length != recipe.getFluidInputs().size()) validRecipe = false;
+	}
 
-		for (int i = 0; i < recipe.getInputs().size(); ++i) {
-			GTRecipeInput input = recipe.getInputs().get(i);
-			if (input != null && input.getInputStacks().length > 1) {
-				subMap.put(i, input);
-			}
-		}
+	public boolean isValidPattern() {
+		return validRecipe;
 	}
 
 	@Override
@@ -66,27 +84,34 @@ public abstract class AbstractPatternHelper implements IProvidablePattern, ISubs
 	@Override
 	public void injectSubstitutions(ISubstitutionStorage storage) {
 		if (storage == null) return;
-
-		if (substitutionStorage.get() != storage) substitutionStorage = new WeakReference<>(storage);
-
+		substitutionStorage = storage;
 		for (Map.Entry<Integer, GTRecipeInput> entry : subMap.entrySet()) {
 			GTRecipeInput input = entry.getValue();
-			String name = GTHelperUtility.getRecipeInputName(input);
-
-			ItemStack stack = input.getInputStacks()[storage.getOption(name)];
-
+			String name = input.isOreDict()
+					? OreDictionary.getOreName(input.getOreDict())
+					: substitutionPrefix + entry.getKey();
+			ItemStack[] candidates = input.getInputStacks();
+			storage.registerCandidates(name, candidates);
+			java.util.List<ItemStack> available = storage.getCandidates(name);
+			int option = storage.getOption(name);
+			if (option < 0 || option >= available.size()) {
+				validRecipe = false;
+				continue;
+			}
+			ItemStack stack = available.get(option).copy();
+			stack.setCount(input.getAmount());
 			inputs[entry.getKey()] = itemChannel.createStack(stack);
 		}
 	}
 
 	@Override
 	public ISubstitutionStorage getSubstitutionStorage() {
-		return substitutionStorage.get();
+		return substitutionStorage;
 	}
 
 	@Override
 	public void providePatterns(ICraftingMedium medium, ICraftingProviderHelper helper) {
-		if (helper == null) return;
+		if (helper == null || !validRecipe) return;
 
 		helper.addCraftingOption(medium, this);
 	}

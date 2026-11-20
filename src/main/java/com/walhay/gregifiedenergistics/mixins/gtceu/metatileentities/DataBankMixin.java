@@ -9,10 +9,9 @@ import gregtech.api.recipes.Recipe;
 import gregtech.common.metatileentities.multi.electric.MetaTileEntityDataBank;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Set;
 import net.minecraft.util.ResourceLocation;
 import org.objectweb.asm.Opcodes;
-import org.spongepowered.asm.mixin.Implements;
-import org.spongepowered.asm.mixin.Interface;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -22,7 +21,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(MetaTileEntityDataBank.class)
-@Implements(@Interface(iface = INetRecipeHandler.class, prefix = "dataHandler$"))
 public abstract class DataBankMixin extends MultiblockWithDisplayBase implements INetRecipeHandler {
 
 	private DataBankMixin(ResourceLocation metaTileEntityId) {
@@ -52,8 +50,8 @@ public abstract class DataBankMixin extends MultiblockWithDisplayBase implements
 	}
 
 	@Override
-	@Unique public void onRecipesUpdate(Collection<INetRecipeHandler> seen) {
-		seen.add(this);
+	@Unique public void onRecipesUpdate(Set<INetRecipeHandler> seen) {
+		if (!seen.add(this)) return;
 
 		for (IOpticalDataAccessHatch hatch : getAbilities(MultiblockAbility.OPTICAL_DATA_TRANSMISSION)) {
 			if (hatch instanceof INetRecipeHandler handler) {
@@ -65,8 +63,8 @@ public abstract class DataBankMixin extends MultiblockWithDisplayBase implements
 	}
 
 	@Override
-	@Unique public Collection<Recipe> getRecipes(Collection<INetRecipeHandler> seen) {
-		seen.add(this);
+	@Unique public Collection<Recipe> getRecipes(Set<INetRecipeHandler> seen) {
+		if (!seen.add(this)) return null;
 
 		if (!isActive()) return null;
 
@@ -79,9 +77,7 @@ public abstract class DataBankMixin extends MultiblockWithDisplayBase implements
 	}
 
 	@Unique private void getRecipesCollector(
-			Collection<Recipe> recipes,
-			Iterable<? extends IDataAccessHatch> hatches,
-			Collection<INetRecipeHandler> seen) {
+			Collection<Recipe> recipes, Iterable<? extends IDataAccessHatch> hatches, Set<INetRecipeHandler> seen) {
 		for (IDataAccessHatch hatch : hatches) {
 			if (hatch instanceof INetRecipeHandler handler) {
 				if (seen.contains(handler)) continue;

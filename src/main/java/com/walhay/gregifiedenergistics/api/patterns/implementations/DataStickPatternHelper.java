@@ -68,6 +68,6 @@ public class DataStickPatternHelper extends AbstractPatternHelper {
 
 	@Override
 	public Collection<IProvidablePattern> getProvidedPatterns() {
-		return Arrays.asList(patterns);
+		return patterns == null ? java.util.Collections.emptyList() : Arrays.asList(patterns);
 	}
 }

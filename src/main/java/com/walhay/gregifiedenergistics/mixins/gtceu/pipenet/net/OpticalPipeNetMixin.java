@@ -10,14 +10,18 @@ import gregtech.common.pipelike.optical.net.OpticalPipeNet;
 import gregtech.common.pipelike.optical.net.OpticalRoutePath;
 import gregtech.common.pipelike.optical.tile.TileEntityOpticalPipe;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(OpticalPipeNet.class)
 public abstract class OpticalPipeNetMixin extends PipeNet<OpticalPipeProperties> {
@@ -26,8 +30,7 @@ public abstract class OpticalPipeNetMixin extends PipeNet<OpticalPipeProperties>
 	@Final
 	private Map<BlockPos, OpticalRoutePath> NET_DATA;
 
-	@Shadow(remap = false)
-	public abstract OpticalRoutePath getNetData(BlockPos pipePos, EnumFacing facing);
+	@Unique private boolean gregified$notifying;
 
 	private OpticalPipeNetMixin(WorldPipeNet<OpticalPipeProperties, ? extends PipeNet<OpticalPipeProperties>> world) {
 		super(world);
@@ -39,40 +42,41 @@ public abstract class OpticalPipeNetMixin extends PipeNet<OpticalPipeProperties>
 		notifyRecipeHandlers();
 	}
 
-	@Override
-	public void onPipeConnectionsUpdate() {
-		notifyRecipeHandlers();
-		super.onPipeConnectionsUpdate();
+	@Inject(
+			method = {"onPipeConnectionsUpdate", "onNeighbourUpdate"},
+			at = @At("HEAD"),
+			remap = false)
+	private void notifyConnectionChanges(CallbackInfo ci) {
 		notifyRecipeHandlers();
 	}
 
 	private void notifyRecipeHandlers() {
-		Collection<INetRecipeHandler> seen = new ArrayList<>();
-		getAllNodes().keySet().forEach(pos -> {
-			for (EnumFacing facing : EnumFacing.values()) {
-				addRecipeHandler(
-						seen,
-						getNetData(pos, facing) instanceof IOpticalRouteAccessor accessor
-								? accessor.getDataHandler()
-								: null);
-
-				TileEntity tile = getWorldData().getTileEntity(pos.offset(facing));
-				if (!(tile instanceof TileEntityOpticalPipe)) {
-					addRecipeHandler(
-							seen,
-							tile == null
-									? null
-									: tile.getCapability(
-											GregifiedEnergisticsCapabilities.CAPABILITY_RECIPE_HANDLER,
-											facing.getOpposite()));
+		if (gregified$notifying || getWorldData() == null || getWorldData().isRemote) return;
+		gregified$notifying = true;
+		try {
+			Set<INetRecipeHandler> targets = INetRecipeHandler.newTraversal();
+			// Include previously routed endpoints so disconnections invalidate their recipes too.
+			for (OpticalRoutePath path : new ArrayList<>(NET_DATA.values())) {
+				if (path instanceof IOpticalRouteAccessor accessor && accessor.getDataHandler() != null)
+					targets.add(accessor.getDataHandler());
+			}
+			NET_DATA.clear();
+			// Do not build routes for arbitrary facings: GregTech's route cache is keyed only by pipe position.
+			for (BlockPos pos : new ArrayList<>(getAllNodes().keySet())) {
+				for (EnumFacing facing : EnumFacing.values()) {
+					TileEntity tile = getWorldData().getTileEntity(pos.offset(facing));
+					if (tile == null || tile instanceof TileEntityOpticalPipe) continue;
+					INetRecipeHandler handler = tile.getCapability(
+							GregifiedEnergisticsCapabilities.CAPABILITY_RECIPE_HANDLER, facing.getOpposite());
+					if (handler != null) targets.add(handler);
 				}
 			}
-		});
-	}
-
-	private void addRecipeHandler(Collection<INetRecipeHandler> seen, Object handler) {
-		if (handler instanceof INetRecipeHandler recipeHandler && seen.add(recipeHandler)) {
-			recipeHandler.onRecipesUpdate(seen);
+			Set<INetRecipeHandler> seen = INetRecipeHandler.newTraversal();
+			for (INetRecipeHandler target : targets) {
+				if (!seen.contains(target)) target.onRecipesUpdate(seen);
+			}
+		} finally {
+			gregified$notifying = false;
 		}
 	}
 }

@@ -19,10 +19,23 @@ out
 # gradle
 build
 .gradle
+/gradle.lockfile
+/gradle/dependency-locks/
+/gradle/verification-metadata.xml
+/gradle/bundled-dependencies.sha256
+
+# generated output
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+*.hprof
+/CODEBASE_AUDIT*.md
 
 # other
 eclipse
 run
+/logs/
 
 # mac
 .DS_Store

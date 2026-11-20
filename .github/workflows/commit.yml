@@ -2,6 +2,7 @@ name: Build Modification
 
 on:
   push:
+  pull_request:
 
 jobs:
   build:
@@ -21,11 +22,5 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v6
 
-    - name: Spotless Check
-      run: ./gradlew spotlessCheck
-
-    - name: Build
-      run: ./gradlew build
-
-    - name: Unit Tests
-      run: ./gradlew test
+    - name: Build and checks
+      run: ./gradlew build --console=plain

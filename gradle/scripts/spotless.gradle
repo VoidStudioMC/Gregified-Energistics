@@ -12,5 +12,4 @@ spotless {
 	}
 }
 
-build.dependsOn spotlessApply
-runClient.dependsOn spotlessApply
+runClient.dependsOn spotlessCheck

@@ -1,9 +1,19 @@
 package com.walhay.gregifiedenergistics.api.patterns.implementations;
 
+import appeng.api.storage.data.IAEFluidStack;
+import appeng.api.storage.data.IAEItemStack;
+import com.walhay.gregifiedenergistics.api.capability.InfiniteItemStackHandler;
 import com.walhay.gregifiedenergistics.api.patterns.AbstractPatternHelper;
 import gregtech.api.recipes.Recipe;
+import gregtech.api.recipes.RecipeMaps;
+import gregtech.api.recipes.ingredients.GTRecipeInput;
+import java.util.Arrays;
 import javax.annotation.Nonnull;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraftforge.common.util.Constants.NBT;
+import net.minecraftforge.fluids.FluidStack;
 
 public class RecipePatternHelper extends AbstractPatternHelper {
 
@@ -12,8 +22,12 @@ public class RecipePatternHelper extends AbstractPatternHelper {
 
 	public RecipePatternHelper(@Nonnull Recipe recipe, @Nonnull ItemStack item) {
 		this.recipe = recipe;
-		this.item = item;
+		this.item = item.copy();
 		parseRecipe(recipe);
+		// Assembly line patterns describe deterministic item outputs.
+		validRecipe &= recipe.getFluidOutputs().isEmpty()
+				&& recipe.getChancedOutputs().getChancedEntries().isEmpty()
+				&& recipe.getChancedFluidOutputs().getChancedEntries().isEmpty();
 	}
 
 	public RecipePatternHelper(@Nonnull Recipe recipe) {
@@ -24,6 +38,90 @@ public class RecipePatternHelper extends AbstractPatternHelper {
 		return recipe;
 	}
 
+	/** Active tasks own their chosen inputs, independently of provider settings. */
+	public RecipePatternHelper copy() {
+		RecipePatternHelper copy = new RecipePatternHelper(recipe, item);
+		copy.inputs = Arrays.stream(inputs)
+				.map(stack -> stack == null ? null : stack.copy())
+				.toArray(IAEItemStack[]::new);
+		copy.fluidInputs = Arrays.stream(fluidInputs)
+				.map(stack -> stack == null ? null : stack.copy())
+				.toArray(IAEFluidStack[]::new);
+		copy.setPriority(getPriority());
+		copy.validRecipe &= validRecipe;
+		return copy;
+	}
+
+	public NBTTagCompound writeToNBT() {
+		NBTTagCompound data = new NBTTagCompound();
+		data.setTag("Recipe", recipeData(recipe));
+		NBTTagList items = new NBTTagList();
+		for (int i = 0; i < inputs.length; ++i) {
+			NBTTagCompound tag = InfiniteItemStackHandler.writeStack(inputs[i].createItemStack());
+			tag.setBoolean("NonConsumable", recipe.getInputs().get(i).isNonConsumable());
+			items.appendTag(tag);
+		}
+		data.setTag("Inputs", items);
+		NBTTagList fluids = new NBTTagList();
+		for (int i = 0; i < fluidInputs.length; ++i) {
+			NBTTagCompound tag = fluidInputs[i].getFluidStack().writeToNBT(new NBTTagCompound());
+			tag.setBoolean("NonConsumable", recipe.getFluidInputs().get(i).isNonConsumable());
+			fluids.appendTag(tag);
+		}
+		data.setTag("FluidInputs", fluids);
+		return data;
+	}
+
+	public static RecipePatternHelper readFromNBT(NBTTagCompound data, ItemStack pattern) {
+		NBTTagList items = data.getTagList("Inputs", NBT.TAG_COMPOUND);
+		NBTTagList fluids = data.getTagList("FluidInputs", NBT.TAG_COMPOUND);
+		ItemStack[] savedItems = new ItemStack[items.tagCount()];
+		Arrays.setAll(savedItems, i -> InfiniteItemStackHandler.readStack(items.getCompoundTagAt(i)));
+		FluidStack[] savedFluids = new FluidStack[fluids.tagCount()];
+		Arrays.setAll(savedFluids, i -> FluidStack.loadFluidStackFromNBT(fluids.getCompoundTagAt(i)));
+		RecipePatternHelper restored = null;
+		for (Recipe recipe : RecipeMaps.ASSEMBLY_LINE_RECIPES.getRecipeList()) {
+			if (recipe.getInputs().size() != savedItems.length
+					|| recipe.getFluidInputs().size() != savedFluids.length
+					|| !recipeData(recipe).equals(data.getCompoundTag("Recipe"))) continue;
+			boolean matches = true;
+			for (int i = 0; i < savedItems.length; ++i) {
+				GTRecipeInput input = recipe.getInputs().get(i);
+				matches &= !savedItems[i].isEmpty()
+						&& savedItems[i].getCount() == input.getAmount()
+						&& items.getCompoundTagAt(i).getBoolean("NonConsumable") == input.isNonConsumable()
+						&& input.acceptsStack(savedItems[i]);
+			}
+			for (int i = 0; i < savedFluids.length; ++i) {
+				GTRecipeInput input = recipe.getFluidInputs().get(i);
+				matches &= savedFluids[i] != null
+						&& savedFluids[i].amount == input.getAmount()
+						&& fluids.getCompoundTagAt(i).getBoolean("NonConsumable") == input.isNonConsumable()
+						&& input.acceptsFluid(savedFluids[i]);
+			}
+			if (!matches) continue;
+			RecipePatternHelper helper = new RecipePatternHelper(recipe, pattern);
+			if (!helper.isValidPattern()) continue;
+			// Never choose arbitrarily between recipes that accept the same saved plan.
+			if (restored != null) return null;
+			Arrays.setAll(helper.inputs, i -> itemChannel.createStack(savedItems[i]));
+			Arrays.setAll(helper.fluidInputs, i -> fluidChannel.createStack(savedFluids[i]));
+			restored = helper;
+		}
+		return restored;
+	}
+
+	private static NBTTagCompound recipeData(Recipe recipe) {
+		NBTTagCompound data = new NBTTagCompound();
+		NBTTagList outputs = new NBTTagList();
+		for (ItemStack output : recipe.getOutputs()) outputs.appendTag(InfiniteItemStackHandler.writeStack(output));
+		data.setTag("Outputs", outputs);
+		data.setInteger("Duration", recipe.getDuration());
+		data.setLong("EUt", recipe.getEUt());
+		data.setTag("Properties", recipe.propertyStorage().serializeNBT());
+		return data;
+	}
+
 	@Override
 	public ItemStack getPattern() {
 		return item;
@@ -31,14 +129,14 @@ public class RecipePatternHelper extends AbstractPatternHelper {
 
 	@Override
 	public int hashCode() {
-		return recipe.hashCode();
+		return System.identityHashCode(recipe);
 	}
 
 	@Override
 	public boolean equals(Object obj) {
-		if (obj instanceof RecipePatternHelper helper) {
-			return this.recipe.equals(helper.getRecipe());
-		}
-		return false;
+		return obj instanceof RecipePatternHelper helper
+				&& recipe == helper.recipe
+				&& Arrays.equals(inputs, helper.inputs)
+				&& Arrays.equals(fluidInputs, helper.fluidInputs);
 	}
 }

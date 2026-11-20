@@ -39,7 +39,7 @@ public class GregifiedEnergisticsGuiTextures {
 
 		for (int indexX = 0; indexX < countX; indexX++) {
 			for (int indexY = 0; indexY < countY; indexY++) {
-				slices[(indexX * countX) + indexY] = UITexture.builder()
+				slices[(indexX * countY) + indexY] = UITexture.builder()
 						.location(Tags.MOD_ID, path)
 						.colorType(colorType)
 						.imageSize(imageWidth, imageHeight)

@@ -1,4 +1,5 @@
 {
+  "required" : true,
   "package" : "com.walhay.gregifiedenergistics.mixins.appeng",
   "refmap" : "mixins.gregifiedenergistics.refmap.json",
   "target" : "@env(DEFAULT)",
@@ -6,6 +7,7 @@
   "compatibilityLevel" : "JAVA_8",
   "mixins" : [
 	"CraftingCPUClusterMixin",
+	"CraftingGridCacheMixin",
 	"TaskProgressMixin"
   ],
   "client": [],

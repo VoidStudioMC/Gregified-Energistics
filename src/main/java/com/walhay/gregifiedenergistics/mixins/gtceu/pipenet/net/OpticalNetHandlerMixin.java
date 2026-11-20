@@ -9,25 +9,18 @@ import gregtech.common.pipelike.optical.net.OpticalPipeNet;
 import gregtech.common.pipelike.optical.net.OpticalRoutePath;
 import gregtech.common.pipelike.optical.tile.TileEntityOpticalPipe;
 import java.util.Collection;
+import java.util.Set;
 import net.minecraft.util.EnumFacing;
-import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Final;
-import org.spongepowered.asm.mixin.Implements;
-import org.spongepowered.asm.mixin.Interface;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
 @Mixin(OpticalNetHandler.class)
-@Implements(@Interface(iface = INetRecipeHandler.class, prefix = "dataHandler$"))
 public abstract class OpticalNetHandlerMixin implements INetRecipeHandler {
 	@Shadow(remap = false)
 	private TileEntityOpticalPipe pipe;
-
-	@Shadow(remap = false)
-	@Final
-	private World world;
 
 	@Shadow(remap = false)
 	@Final
@@ -43,44 +36,29 @@ public abstract class OpticalNetHandlerMixin implements INetRecipeHandler {
 	protected abstract void callSetPipesActive();
 
 	@Override
-	@Unique public void onRecipesUpdate(Collection<INetRecipeHandler> seen) {
-		traverseOnUpdate(seen);
+	@Unique public void onRecipesTransferred() {
+		if (!callIsNetInvalidForTraversal()) callSetPipesActive();
 	}
 
 	@Override
-	@Unique public Collection<Recipe> getRecipes(Collection<INetRecipeHandler> seen) {
-		var recipes = traverseGetRecipes(seen);
-		if (recipes != null) callSetPipesActive();
-		return recipes;
+	@Unique public void onRecipesUpdate(Set<INetRecipeHandler> seen) {
+		if (!seen.add(this)) return;
+		IOpticalNetRecipeHandler handler = getRecipeHandler();
+		if (handler != null && !handler.isTransmitter()) handler.onRecipesUpdate(seen);
 	}
 
-	@Unique private void traverseOnUpdate(Collection<INetRecipeHandler> seen) {
-		if (callIsNetInvalidForTraversal()) return;
-
-		OpticalRoutePath inv = net.getNetData(pipe.getPipePos(), facing);
-		if (inv instanceof IOpticalRouteAccessor accessor) {
-			IOpticalNetRecipeHandler handler = accessor.getDataHandler();
-			if (handler == null) return;
-
-			if (!handler.isTransmitter()) {
-				handler.onRecipesUpdate(seen);
-			}
-		}
+	@Override
+	@Unique public Collection<Recipe> getRecipes(Set<INetRecipeHandler> seen) {
+		if (!seen.add(this)) return null;
+		IOpticalNetRecipeHandler handler = getRecipeHandler();
+		if (handler == null || !handler.isTransmitter()) return null;
+		return handler.getRecipes(seen);
 	}
 
-	@Unique private Collection<Recipe> traverseGetRecipes(Collection<INetRecipeHandler> seen) {
+	@Unique private IOpticalNetRecipeHandler getRecipeHandler() {
 		if (callIsNetInvalidForTraversal()) return null;
 
-		OpticalRoutePath inv = net.getNetData(pipe.getPipePos(), facing);
-		if (inv instanceof IOpticalRouteAccessor accessor) {
-			IOpticalNetRecipeHandler handler = accessor.getDataHandler();
-			if (handler == null) return null;
-
-			if (handler.isTransmitter()) {
-				return handler.getRecipes(seen);
-			}
-		}
-
-		return null;
+		OpticalRoutePath route = net.getNetData(pipe.getPipePos(), facing);
+		return route instanceof IOpticalRouteAccessor accessor ? accessor.getDataHandler() : null;
 	}
 }
