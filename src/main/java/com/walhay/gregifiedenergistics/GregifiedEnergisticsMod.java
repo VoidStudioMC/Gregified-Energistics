@@ -15,7 +15,7 @@ import org.apache.logging.log4j.Logger;
 		version = GregifiedEnergisticsMod.VERSION,
 		dependencies = "required-after:gregtech@[2.9.0-voidstudio];"
 				+ "required-after:appliedenergistics2@[v0.56.7];"
-				+ "required-after:ae2fc@[2.6.6-r];"
+				+ "required-after:ae2fc@[2.6.6-r,);"
 				+ "required-after:modularui@[3.1.5,);"
 				+ "required-after:mixinbooter@[10.2,);after:jei@[4.15.0,);")
 public class GregifiedEnergisticsMod {
