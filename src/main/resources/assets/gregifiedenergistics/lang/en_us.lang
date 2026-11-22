@@ -10,6 +10,7 @@ gregifiedenergistics.machine.me_assembly_line_optical_bus.optical_pipe=Connect t
 
 gregifiedenergistics.machine.me_pattern_buffer.name=ME Pattern Buffer
 gregifiedenergistics.machine.me_pattern_buffer.tooltip=Stores up to 36 processing patterns and their inputs for compatible GregTech recipe multiblocks.
+gregifiedenergistics.machine.me_pattern_buffer.refund_inputs=Removing a pattern returns its remaining items and fluids to the ME network.
 gregifiedenergistics.machine.me_pattern_provider.tooltip=Provides one encoded pattern to the ME network and exports its inputs to the multiblock.
 gregifiedenergistics.machine.me_pattern_provider_iv.name=ME Pattern Provider (IV)
 gregifiedenergistics.machine.me_pattern_provider_luv.name=ME Pattern Provider (LuV)
@@ -40,6 +41,7 @@ gregifiedenergistics.machine.me.paste_settings=Substitution settings loaded from
 gregifiedenergistics.gui.substitution=Substitution
 
 gregifiedenergistics.gui.buffer_contents=Buffer #%d contents
+gregifiedenergistics.gui.buffer_inventory_hint=Press B over a slot to open its contents.
 gregifiedenergistics.gui.buffer_items=Items
 gregifiedenergistics.gui.buffer_fluids=Fluids
 gregifiedenergistics.gui.buffer_empty=No pattern

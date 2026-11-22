@@ -109,7 +109,7 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 	public void addInformation(
 			ItemStack stack, @Nullable World player, @NotNull List<String> tooltip, boolean advanced) {
 		super.addInformation(stack, player, tooltip, advanced);
-		tooltip.add(I18n.format("gregifiedenergistics.machine.me_pattern_buffer.tooltip"));
+		tooltip.add(I18n.format("gregifiedenergistics.machine.me_pattern_buffer.refund_inputs"));
 		if (stack.hasTagCompound() && stack.getTagCompound().hasKey("PatternInventory")) {
 			tooltip.add(I18n.format("gregifiedenergistics.machine.me_pattern_buffer.retains_inventory"));
 		}
@@ -240,6 +240,7 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 	@SuppressWarnings("UnstableApiUsage")
 	public ModularPanel buildUI(PosGuiData guiData, PanelSyncManager syncManager, UISettings settings) {
 		syncManager.registerSlotGroup("pattern_inv", 9);
+		IKey inventoryHint = IKey.lang("gregifiedenergistics.gui.buffer_inventory_hint");
 
 		return GregifiedEnergisticsGuis.createPanel(
 						this, GTGuis.DEFAULT_WIDTH, CONTENT_TOP + 4 * SLOT_SIZE + INVENTORY_SPACE)
@@ -270,6 +271,7 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 									@Override
 									public void buildTooltip(ItemStack stack, RichTooltip tooltip) {
 										super.buildTooltip(stack, tooltip);
+										tooltip.addLine(inventoryHint);
 										PatternContainer container =
 												patternHandler.getContainers().get(index);
 
@@ -285,6 +287,7 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 								}.slot(SyncHandlers.itemSlot(patternHandler, index)
 												.changeListener((newItem, onlyAmountChanged, client, init) ->
 														patternHandler.onContentsChanged(index)))
+										.tooltip(tooltip -> tooltip.addLine(inventoryHint))
 										.background(
 												GTGuiTextures.SLOT,
 												GregifiedEnergisticsGuiTextures.PATTERN_OVERLAY
