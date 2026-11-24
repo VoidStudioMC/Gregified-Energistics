@@ -12,12 +12,10 @@ import static com.walhay.gregifiedenergistics.api.patterns.substitutions.Substit
 import static com.walhay.gregifiedenergistics.api.util.BlockingMode.BLOCKING_MODE_TAG;
 
 import appeng.api.AEApi;
-import appeng.api.config.Actionable;
 import appeng.api.networking.crafting.ICraftingPatternDetails;
 import appeng.api.networking.crafting.ICraftingProviderHelper;
 import appeng.api.storage.channels.IFluidStorageChannel;
 import appeng.api.storage.data.IAEFluidStack;
-import appeng.me.GridAccessException;
 import appeng.util.InventoryAdaptor;
 import appeng.util.inv.AdaptorItemHandler;
 import codechicken.lib.raytracer.CuboidRayTraceResult;
@@ -39,7 +37,6 @@ import com.cleanroommc.modularui.widgets.CycleButtonWidget;
 import com.cleanroommc.modularui.widgets.DynamicSyncedWidget;
 import com.cleanroommc.modularui.widgets.PageButton;
 import com.cleanroommc.modularui.widgets.PagedWidget;
-import com.cleanroommc.modularui.widgets.ToggleButton;
 import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.layout.Grid;
 import com.cleanroommc.modularui.widgets.slot.ItemSlot;
@@ -52,6 +49,7 @@ import com.walhay.gregifiedenergistics.api.patterns.ISubstitutionNotifiable;
 import com.walhay.gregifiedenergistics.api.patterns.ISubstitutionStorage;
 import com.walhay.gregifiedenergistics.api.patterns.substitutions.SubstitutionStorage;
 import com.walhay.gregifiedenergistics.api.util.AssemblyLineFluidTransfer;
+import com.walhay.gregifiedenergistics.api.util.AssemblyLineInputs;
 import com.walhay.gregifiedenergistics.api.util.BlockingMode;
 import com.walhay.gregifiedenergistics.client.render.GregifiedEnergisticsTextures;
 import com.walhay.gregifiedenergistics.common.mui.SubstitutionSlotWidget;
@@ -65,7 +63,6 @@ import gregtech.api.metatileentity.multiblock.IMultiblockAbilityPart;
 import gregtech.api.metatileentity.multiblock.MultiblockAbility;
 import gregtech.api.metatileentity.multiblock.MultiblockControllerBase;
 import gregtech.api.metatileentity.multiblock.RecipeMapMultiblockController;
-import gregtech.api.mui.GTGuiTextures;
 import gregtech.client.renderer.texture.cube.SimpleOverlayRenderer;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.util.Collection;
@@ -97,18 +94,16 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 		implements IMultiblockAbilityPart<IItemHandlerModifiable>, ISubstitutionNotifiable {
 
 	public static final String WORKING_ENABLED_TAG = "WorkingEnabled";
-	public static final String USE_FLUID_TAG = "FluidMode";
 	public static final String FLUID_TO_SEND_TAG = "FluidToSend";
 	public static final String ITEM_TO_SEND_TAG = "ItemToSend";
 	public static final String SEND_SLOT_TAG = "Slot";
 	private static final String OWNED_FLUID_TAG = "ExtractedFluids";
+	private static final String FLUID_QUEUE_VERSION_TAG = "FluidQueueVersion";
 
 	private final Int2ObjectOpenHashMap<ItemStack> waitingToSend = new Int2ObjectOpenHashMap<>();
-	// Requests still belong to ME. Only extractedFluids have been removed from ME storage.
+	// Every queued fluid is already owned by this bus; the CPU reserved and supplied it.
 	private final Int2ObjectOpenHashMap<FluidStack> fluidWaitingToSend = new Int2ObjectOpenHashMap<>();
-	private final Int2ObjectOpenHashMap<FluidStack> extractedFluids = new Int2ObjectOpenHashMap<>();
 	private BlockingMode blockingMode = BlockingMode.NO_BLOCKING;
-	private boolean useFluids = true;
 	private boolean workingEnabled = true;
 	protected final ISubstitutionStorage substitutionStorage = new SubstitutionStorage(this);
 
@@ -252,26 +247,14 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 	@SuppressWarnings("UnstableApiUsage")
 	public Flow createButtonBar(PanelSyncManager sync) {
 		BooleanSyncValue workingStateValue = new BooleanSyncValue(this::isWorkingEnabled, this::setWorkingEnabled);
-		BooleanSyncValue fluidStateValue = new BooleanSyncValue(this::getUsingFluids, this::setUsingFluids);
 		EnumSyncValue<BlockingMode> blockingStateValue =
 				new EnumSyncValue<>(BlockingMode.class, this::getBlockingMode, this::setBlockingMode);
 
 		sync.syncValue("working_enabled", workingStateValue);
-		sync.syncValue("fluid_mode", fluidStateValue);
 		sync.syncValue("blocking_mode", blockingStateValue);
 
 		return GregifiedEnergisticsGuis.buttonColumn()
 				.child(GregifiedEnergisticsGuis.workingButton(workingStateValue))
-				.child(new ToggleButton()
-						.value(fluidStateValue)
-						.tooltipAutoUpdate(true)
-						.tooltipBuilder(t -> t.addLine(IKey.lang(
-								fluidStateValue.getBoolValue()
-										? "gregifiedenergistics.gui.fluid_mode.enabled"
-										: "gregifiedenergistics.gui.fluid_mode.disabled")))
-						.top(2 * SLOT_SIZE)
-						.overlay(false, GTGuiTextures.BUTTON_FLUID[0])
-						.overlay(true, GTGuiTextures.BUTTON_FLUID[1]))
 				.child(new CycleButtonWidget()
 						.value(blockingStateValue)
 						.tooltipAutoUpdate(true)
@@ -392,7 +375,7 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 		super.writeToNBT(data);
 		data.setBoolean(WORKING_ENABLED_TAG, workingEnabled);
 		data.setString(BLOCKING_MODE_TAG, blockingMode.name());
-		data.setBoolean(USE_FLUID_TAG, useFluids);
+		data.removeTag("FluidMode");
 		writeQueueData(data);
 		return data;
 	}
@@ -406,10 +389,14 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 		}
 		if (items.isEmpty()) data.removeTag(ITEM_TO_SEND_TAG);
 		else data.setTag(ITEM_TO_SEND_TAG, items);
-		if (fluidWaitingToSend.isEmpty()) data.removeTag(FLUID_TO_SEND_TAG);
-		else data.setTag(FLUID_TO_SEND_TAG, writeFluidQueue(fluidWaitingToSend));
-		if (extractedFluids.isEmpty()) data.removeTag(OWNED_FLUID_TAG);
-		else data.setTag(OWNED_FLUID_TAG, writeFluidQueue(extractedFluids));
+		if (fluidWaitingToSend.isEmpty()) {
+			data.removeTag(FLUID_TO_SEND_TAG);
+			data.removeTag(FLUID_QUEUE_VERSION_TAG);
+		} else {
+			data.setTag(FLUID_TO_SEND_TAG, writeFluidQueue(fluidWaitingToSend));
+			data.setInteger(FLUID_QUEUE_VERSION_TAG, 1);
+		}
+		data.removeTag(OWNED_FLUID_TAG);
 	}
 
 	private static NBTTagList writeFluidQueue(Int2ObjectOpenHashMap<FluidStack> queue) {
@@ -443,7 +430,6 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 		} catch (IllegalArgumentException ignored) {
 			// Missing/obsolete mode names retain the default.
 		}
-		useFluids = !data.hasKey(USE_FLUID_TAG) || data.getBoolean(USE_FLUID_TAG);
 		readQueueData(data);
 	}
 
@@ -456,12 +442,9 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 			ItemStack stack = InfiniteItemStackHandler.readStack(entry);
 			if (slot >= 0 && slot < MAX_SLOTS && !stack.isEmpty()) waitingToSend.put(slot, stack);
 		}
-		readFluidQueue(data.getTagList(FLUID_TO_SEND_TAG, NBT.TAG_COMPOUND), fluidWaitingToSend);
-		readFluidQueue(data.getTagList(OWNED_FLUID_TAG, NBT.TAG_COMPOUND), extractedFluids);
-		for (var entry : extractedFluids.entrySet()) {
-			if (!fluidWaitingToSend.containsKey(entry.getKey()))
-				fluidWaitingToSend.put(entry.getKey(), entry.getValue().copy());
-		}
+		// Legacy FluidToSend entries were requests, not owned fluid. Recover only extracted remainders.
+		String fluidTag = data.getInteger(FLUID_QUEUE_VERSION_TAG) >= 1 ? FLUID_TO_SEND_TAG : OWNED_FLUID_TAG;
+		readFluidQueue(data.getTagList(fluidTag, NBT.TAG_COMPOUND), fluidWaitingToSend);
 	}
 
 	@Override
@@ -469,7 +452,6 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 		super.writeInitialSyncData(buf);
 		buf.writeBoolean(workingEnabled);
 		buf.writeEnumValue(blockingMode);
-		buf.writeBoolean(useFluids);
 	}
 
 	@Override
@@ -477,7 +459,6 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 		super.receiveInitialSyncData(buf);
 		workingEnabled = buf.readBoolean();
 		blockingMode = buf.readEnumValue(BlockingMode.class);
-		useFluids = buf.readBoolean();
 	}
 
 	@Override
@@ -576,94 +557,36 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 			return false;
 		}
 
-		IAEFluidStack[] fluids = null;
-		if (pattern instanceof AbstractPatternHelper patternHelper) {
-			fluids = patternHelper.getFluidInputs();
-		}
+		AssemblyLineInputs inputs = AssemblyLineInputs.read(inventoryCrafting);
+		if (inputs == null
+				|| !inputs.matchesFluidInputs(pattern)
+				|| !acceptsItems(inputs.items)
+				|| !acceptsFluids(inputs.fluids)) return false;
 
-		if (acceptsItems(inventoryCrafting) && (!useFluids || acceptsFluids(fluids))) {
-			int slot = 0;
-			for (int i = 0; i < inventoryCrafting.getSizeInventory(); ++i) {
-				ItemStack stack = inventoryCrafting.getStackInSlot(i);
-				if (!stack.isEmpty()) {
-					addToSendList(slot++, stack.copy());
-				}
-			}
-
-			if (useFluids && fluids != null) {
-				slot = 0;
-				for (IAEFluidStack fluidStack : fluids) {
-					if (fluidStack == null) continue;
-					FluidStack stack = fluidStack.getFluidStack();
-					if (stack != null && stack.amount != 0) {
-						addToSendList(slot++, stack.copy());
-					}
-				}
-				if (hasFluidsToSend()) pushFluidsOut();
-			}
-			if (hasItemsToSend()) pushItemsOut();
-			return true;
-		}
-
-		return false;
+		for (int i = 0; i < inputs.items.size(); ++i) addToSendList(i, inputs.items.get(i));
+		for (int i = 0; i < inputs.fluids.size(); ++i) addToSendList(i, inputs.fluids.get(i));
+		if (hasFluidsToSend()) pushFluidsOut();
+		if (hasItemsToSend()) pushItemsOut();
+		return true;
 	}
 
-	// check if buses is able to accept items from pattern
-	private boolean acceptsItems(final InventoryCrafting inventoryCrafting) {
+	private boolean acceptsItems(List<ItemStack> items) {
 		List<InventoryAdaptor> inventoryAdaptors = getController().getAbilities(MultiblockAbility.IMPORT_ITEMS).stream()
 				.filter(i -> !(i instanceof GhostCircuitItemStackHandler))
 				.map(AdaptorItemHandler::new)
 				.collect(Collectors.toList());
-		Iterator<InventoryAdaptor> it = inventoryAdaptors.iterator();
-
-		for (int i = 0; i < inventoryCrafting.getSizeInventory(); ++i) {
-			ItemStack stack = inventoryCrafting.getStackInSlot(i);
-			if (stack.isEmpty()) {
-				continue;
-			}
-
-			if (!it.hasNext()) {
-				return false;
-			}
-
-			if (!it.next().simulateAdd(stack).isEmpty()) {
-				return false;
-			}
-		}
-
+		if (items.size() > inventoryAdaptors.size() || items.size() > MAX_SLOTS) return false;
+		for (int i = 0; i < items.size(); ++i)
+			if (!inventoryAdaptors.get(i).simulateAdd(items.get(i).copy()).isEmpty()) return false;
 		return true;
 	}
 
-	private boolean acceptsFluids(IAEFluidStack[] inputs) {
-		if (inputs == null || inputs.length == 0) return true;
-		if (getProxy() == null || !isAttachedToMultiBlock()) return false;
+	private boolean acceptsFluids(List<FluidStack> inputs) {
 		List<IFluidTank> tanks = getController().getAbilities(MultiblockAbility.IMPORT_FLUIDS);
-		List<IAEFluidStack> cumulative = new java.util.ArrayList<>();
-		int slot = 0;
-		for (IAEFluidStack input : inputs) {
-			if (input == null || input.getStackSize() <= 0) continue;
-			if (input.getStackSize() > Integer.MAX_VALUE || slot >= tanks.size()) return false;
-			FluidStack fluid = input.getFluidStack();
-			if (fluid == null || tanks.get(slot++).fill(fluid.copy(), false) < input.getStackSize()) return false;
-			IAEFluidStack total = null;
-			for (IAEFluidStack existing : cumulative)
-				if (existing.getFluidStack().isFluidEqual(fluid)) {
-					total = existing;
-					break;
-				}
-			if (total == null) cumulative.add(input.copy());
-			else total.setStackSize(total.getStackSize() + input.getStackSize());
-		}
-		try {
-			var inventory = getProxy().getStorage().getInventory(getStorageChannel());
-			for (IAEFluidStack total : cumulative) {
-				IAEFluidStack available = inventory.extractItems(total, Actionable.SIMULATE, getActionSource());
-				if (available == null || available.getStackSize() < total.getStackSize()) return false;
-			}
-			return true;
-		} catch (GridAccessException ignored) {
-			return false;
-		}
+		if (inputs.size() > tanks.size() || inputs.size() > MAX_SLOTS) return false;
+		for (int i = 0; i < inputs.size(); ++i)
+			if (tanks.get(i).fill(inputs.get(i).copy(), false) < inputs.get(i).amount) return false;
+		return true;
 	}
 
 	// Push items from auto-crafting to input buses
@@ -712,36 +635,12 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 		while (iterator.hasNext()) {
 			var entry = iterator.next();
 			int slot = entry.getKey();
-			FluidStack request = entry.getValue();
-			if (request == null || request.amount <= 0) {
-				if (!extractedFluids.containsKey(slot)) iterator.remove();
-				continue;
-			}
 			if (slot < 0 || slot >= tanks.size()) continue;
-			try {
-				FluidStack owned = extractedFluids.get(slot);
-				var network = owned != null || getProxy() == null
-						? null
-						: getProxy().getStorage().getInventory(getStorageChannel());
-				AssemblyLineFluidTransfer.Result result =
-						AssemblyLineFluidTransfer.transfer(tanks.get(slot), request, owned, offer -> {
-							if (network == null) return null;
-							IAEFluidStack extracted = network.extractItems(
-									getStorageChannel().createStack(offer), Actionable.MODULATE, getActionSource());
-							return extracted == null ? null : extracted.getFluidStack();
-						});
-				if (result.remainder == null) extractedFluids.remove(slot);
-				else extractedFluids.put(slot, result.remainder);
-				request.amount -= result.delivered;
-				if (request.amount <= 0 && result.remainder == null) iterator.remove();
-				if (result.delivered > 0
-						|| (owned == null
-								? result.remainder != null
-								: result.remainder == null || !owned.isFluidStackIdentical(result.remainder)))
-					markDirty();
-			} catch (GridAccessException ignored) {
-				// ME is unavailable. Keep both the outstanding request and all already extracted fluid.
-			}
+			AssemblyLineFluidTransfer.Result result = AssemblyLineFluidTransfer.transfer(
+					tanks.get(slot), entry.getValue(), entry.getValue(), offer -> null);
+			if (result.remainder == null) iterator.remove();
+			else entry.setValue(result.remainder);
+			if (result.delivered > 0) markDirty();
 		}
 	}
 
@@ -788,16 +687,6 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 
 	public BlockingMode getBlockingMode() {
 		return blockingMode;
-	}
-
-	public void setUsingFluids(boolean useFluids) {
-		if (this.useFluids == useFluids) return;
-		this.useFluids = useFluids;
-		if (getWorld() != null && !getWorld().isRemote) markDirty();
-	}
-
-	public boolean getUsingFluids() {
-		return useFluids;
 	}
 
 	@Override

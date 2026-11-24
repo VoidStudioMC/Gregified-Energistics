@@ -2,12 +2,15 @@ package com.walhay.gregifiedenergistics.api.patterns.implementations;
 
 import appeng.api.storage.data.IAEFluidStack;
 import appeng.api.storage.data.IAEItemStack;
+import com.glodblock.github.common.item.fake.FakeFluids;
+import com.glodblock.github.util.FluidPatternDetails;
 import com.walhay.gregifiedenergistics.api.capability.InfiniteItemStackHandler;
 import com.walhay.gregifiedenergistics.api.patterns.AbstractPatternHelper;
 import gregtech.api.recipes.Recipe;
 import gregtech.api.recipes.RecipeMaps;
 import gregtech.api.recipes.ingredients.GTRecipeInput;
 import java.util.Arrays;
+import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -38,6 +41,18 @@ public class RecipePatternHelper extends AbstractPatternHelper {
 		return recipe;
 	}
 
+	@Override
+	public IAEItemStack[] getInputs() {
+		// AE2FC accounts for these drops as millibuckets in the fluid storage channel.
+		return Stream.concat(Arrays.stream(inputs), Arrays.stream(fluidInputs).map(FakeFluids::packFluid2AEDrops))
+				.toArray(IAEItemStack[]::new);
+	}
+
+	@Override
+	public IAEItemStack[] getCondensedInputs() {
+		return FluidPatternDetails.condenseStacks(getInputs());
+	}
+
 	/** Active tasks own their chosen inputs, independently of provider settings. */
 	public RecipePatternHelper copy() {
 		RecipePatternHelper copy = new RecipePatternHelper(recipe, item);
@@ -54,6 +69,7 @@ public class RecipePatternHelper extends AbstractPatternHelper {
 
 	public NBTTagCompound writeToNBT() {
 		NBTTagCompound data = new NBTTagCompound();
+		data.setBoolean("FluidInputsInCrafting", true);
 		data.setTag("Recipe", recipeData(recipe));
 		NBTTagList items = new NBTTagList();
 		for (int i = 0; i < inputs.length; ++i) {
@@ -75,6 +91,8 @@ public class RecipePatternHelper extends AbstractPatternHelper {
 	public static RecipePatternHelper readFromNBT(NBTTagCompound data, ItemStack pattern) {
 		NBTTagList items = data.getTagList("Inputs", NBT.TAG_COMPOUND);
 		NBTTagList fluids = data.getTagList("FluidInputs", NBT.TAG_COMPOUND);
+		// Older jobs never reserved their fluid inputs in the CPU. Replanning must include them.
+		if (!fluids.isEmpty() && !data.getBoolean("FluidInputsInCrafting")) return null;
 		ItemStack[] savedItems = new ItemStack[items.tagCount()];
 		Arrays.setAll(savedItems, i -> InfiniteItemStackHandler.readStack(items.getCompoundTagAt(i)));
 		FluidStack[] savedFluids = new FluidStack[fluids.tagCount()];

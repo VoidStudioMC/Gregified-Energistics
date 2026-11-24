@@ -20,11 +20,11 @@ Minecraft 1.12.2 with Forge and the following mods. These versions were checked 
 | --- | --- | --- |
 | GregTech, VoidStudio fork | `2.9.0-voidstudio` | `gregtech` |
 | AE2 Extended Life | `v0.56.7` | `appliedenergistics2` |
-| AE2 Fluid Crafting Rework | `2.6.6-r` | `ae2fc` |
+| AE2 Fluid Crafting, unofficial | `2.7.10-unofficial` | `ae2fc` |
 | ModularUI | `3.1.5` | `modularui` |
 | MixinBooter | `10.2` | `mixinbooter` |
 
-GT, AE2 and AE2FC are required at the listed versions because their recipe and crafting APIs are used directly. ModularUI requires at least 3.1.5 and MixinBooter at least 10.2. JEI is optional. Use the VoidStudio GregTech fork; the development JAR and sources under `libs/` are the build dependencies.
+GT, AE2 and AE2FC are required at the listed versions because their recipe and crafting APIs are used directly. ModularUI requires at least 3.1.5 and MixinBooter at least 10.2. JEI is optional. Use the VoidStudio GregTech fork; the development JAR and sources under `libs/` are the build dependencies. The unofficial AE2FC build is downloaded from [CurseForge file 7742544](https://www.curseforge.com/minecraft/mc-mods/ae2fluidcraft-rework-unofficial/files/7742544) through CurseMaven and deobfuscated by Gradle; install that version on both client and server.
 
 ## Machines
 
@@ -39,11 +39,15 @@ The buffer and providers require a multiblock that accepts their import-item abi
 
 Connect the optical bus to a Data Bank's optical transmitter through optical pipes. A screwdriver changes the bus's optical side. In Assembly Line buses, sneak-right-click with a Memory Card to copy substitution choices and right-click to paste. Each pattern slot stores a recipe source; the ingredients of that recipe go to input buses in order.
 
+Assembly Line buses include every recipe fluid in the AE2 crafting plan, including recipes from Data Sticks and the optical Data Bank. Fluids appear in the order preview and can be autocrafted through other processing patterns. Encoded AE2FC processing patterns can specify items and fluids together: items go to input buses in item order, fluids to input hatches in fluid order. Each fluid input requires its corresponding hatch to accept the full amount before the bus accepts a craft. The bus uses fluids supplied by the crafting CPU; fluid ordering is always enabled.
+
 In the Pattern Buffer GUI, hover over a pattern slot and press **B** to inspect its inputs. When a pattern is removed or changed, its remaining inputs are returned to ME. If ME cannot accept them, the container stays pending until they can be returned or removed through the GUI. The replacement pattern starts accepting crafts once the old contents are empty.
 
 ## Persistence and updating
 
-Dismantling a Pattern Buffer keeps its patterns, items and fluids in the dropped machine item. Assembly Line buses retain their pending item queue and already extracted fluids in their dropped item. Place the item again to recover its contents. Large item quantities use an integer in saved NBT; the GUI shows ordinary stack sizes and reports the full stored count separately.
+Dismantling a Pattern Buffer keeps its patterns, items and fluids in the dropped machine item. Assembly Line buses retain their pending item queue and CPU-supplied fluids in their dropped item. Place the item again to recover its contents. Large item quantities use an integer in saved NBT; the GUI shows ordinary stack sizes and reports the full stored count separately.
+
+When updating to fluid-aware Assembly Line crafting, saved recipe jobs that did not reserve fluids are canceled through AE2 and must be ordered again. Already extracted fluid remainders in buses are retained; old unfulfilled direct-extraction requests are discarded. Ingredients already delivered to the Assembly Line remain in its buses and hatches.
 
 When updating from the older save format, crafting jobs containing only a numeric recipe ID or an unmarked processing pattern with an integrated circuit are canceled through AE2 after CPU initialization. CPU-owned inputs return through AE2; inputs already delivered to machines remain there. New jobs persist recipe identities, selected substitutions and ghost circuit wrappers. Quantities already lost by the old byte-sized item serializer cannot be reconstructed.
 

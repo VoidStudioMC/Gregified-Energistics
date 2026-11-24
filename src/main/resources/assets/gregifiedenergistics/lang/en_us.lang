@@ -2,7 +2,7 @@ gregifiedenergistics.machine.me_assembly_line_bus.name=ME Assembly Line Bus
 gregifiedenergistics.machine.me_assembly_line_bus.tooltip=Replaces the first Assembly Line input bus and imports recipes from your ME network.
 gregifiedenergistics.machine.me_assembly_line_bus.datastick=Accepts encoded Data Sticks and AE2 crafting patterns as recipe sources.
 gregifiedenergistics.machine.me_assembly_line_bus.pattern_slots=Each slot stores a recipe source. Recipe ingredients are sent to the input buses in order.
-gregifiedenergistics.machine.me_assembly_line_bus.fluid_mode=Fluid inputs are supported when recipes come from encoded Data Sticks.
+gregifiedenergistics.machine.me_assembly_line_bus.fluid_mode=Fluids from Data Sticks and AE2FC patterns are always included in the crafting plan and sent to input hatches in order.
 
 gregifiedenergistics.machine.me_assembly_line_optical_bus.name=ME Assembly Line Optical Bus
 gregifiedenergistics.machine.me_assembly_line_optical_bus.tooltip=Replaces the first Assembly Line input bus and reads recipes from a connected optical network.
@@ -22,8 +22,6 @@ gregifiedenergistics.gui.no_blocking=Blocking: Disabled
 gregifiedenergistics.gui.blocking_mode=Blocking: Enabled
 gregifiedenergistics.gui.crafting_blocking_mode=Blocking: Crafting Only
 
-gregifiedenergistics.gui.fluid_mode.enabled=Fluid inputs: Enabled
-gregifiedenergistics.gui.fluid_mode.disabled=Fluid inputs: Disabled
 gregifiedenergistics.gui.working.enabled=Machine: Enabled
 gregifiedenergistics.gui.working.disabled=Machine: Disabled
 

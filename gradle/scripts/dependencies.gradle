@@ -75,7 +75,7 @@ dependencies {
 
 	implementation rfg.deobf("curse.maven:ae2-extended-life-570458:6302098")
 
-	implementation rfg.deobf("curse.maven:ae2-fluid-crafting-rework-623955:5751930")
+	implementation rfg.deobf('curse.maven:ae2fluidcraft-rework-unofficial-1404390:7742544')
 
     implementation 'mezz.jei:jei_1.12.2:4.16.1.302'
 }

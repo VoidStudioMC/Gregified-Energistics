@@ -2,7 +2,7 @@ gregifiedenergistics.machine.me_assembly_line_bus.name=ME-шина сбороч�
 gregifiedenergistics.machine.me_assembly_line_bus.tooltip=Заменяет первую входную шину сборочной линии и получает рецепты из ME-сети.
 gregifiedenergistics.machine.me_assembly_line_bus.datastick=Принимает флешки данных и шаблоны AE2 как источники рецептов.
 gregifiedenergistics.machine.me_assembly_line_bus.pattern_slots=Каждый слот хранит источник рецепта. Ингредиенты рецепта отправляются во входные шины по порядку.
-gregifiedenergistics.machine.me_assembly_line_bus.fluid_mode=Жидкостные входы поддерживаются для рецептов с флешек данных.
+gregifiedenergistics.machine.me_assembly_line_bus.fluid_mode=Жидкости из флешек данных и шаблонов AE2FC всегда входят в заказ крафта и отправляются в люки по порядку.
 
 gregifiedenergistics.machine.me_assembly_line_optical_bus.name=ME-оптическая шина сборочной линии
 gregifiedenergistics.machine.me_assembly_line_optical_bus.tooltip=Заменяет первую входную шину сборочной линии и получает рецепты из оптической сети.
@@ -22,8 +22,6 @@ gregifiedenergistics.gui.no_blocking=Блокировка: отключена
 gregifiedenergistics.gui.blocking_mode=Блокировка: включена
 gregifiedenergistics.gui.crafting_blocking_mode=Блокировка: только во время крафта
 
-gregifiedenergistics.gui.fluid_mode.enabled=Жидкостные входы: включены
-gregifiedenergistics.gui.fluid_mode.disabled=Жидкостные входы: отключены
 gregifiedenergistics.gui.working.enabled=Машина: включена
 gregifiedenergistics.gui.working.disabled=Машина: отключена
 
