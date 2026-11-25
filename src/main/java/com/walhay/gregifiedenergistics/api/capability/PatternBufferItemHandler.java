@@ -1,19 +1,19 @@
 package com.walhay.gregifiedenergistics.api.capability;
 
-import gregtech.api.capability.INotifiableHandler;
 import gregtech.api.metatileentity.MetaTileEntity;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraftforge.items.IItemHandler;
 
 /** Item-only recipe inventory with dynamic slots and controller notifications. */
-public final class PatternBufferItemHandler extends SegmentItemHandlerList implements INotifiableHandler {
+public final class PatternBufferItemHandler extends SegmentItemHandlerList implements PatternBufferHandler {
 	private final List<MetaTileEntity> notifiableEntities = new ArrayList<>();
 
 	public PatternBufferItemHandler(IItemHandler... handlers) {
 		super(handlers);
 	}
 
+	@Override
 	public void onContentsChanged() {
 		for (MetaTileEntity entity : notifiableEntities) addToNotifiedList(entity, this, false);
 	}

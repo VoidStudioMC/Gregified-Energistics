@@ -42,8 +42,7 @@ import com.cleanroommc.modularui.widgets.slot.ModularSlot;
 import com.glodblock.github.common.item.fake.FakeFluids;
 import com.glodblock.github.common.item.fake.FakeItemRegister;
 import com.walhay.gregifiedenergistics.api.capability.AbstractPatternItemHandler;
-import com.walhay.gregifiedenergistics.api.capability.PatternBufferDualHandler;
-import com.walhay.gregifiedenergistics.api.capability.PatternBufferItemHandler;
+import com.walhay.gregifiedenergistics.api.capability.PatternBufferHandler;
 import com.walhay.gregifiedenergistics.api.capability.PatternBufferStorage;
 import com.walhay.gregifiedenergistics.api.capability.SegmentItemHandlerList;
 import com.walhay.gregifiedenergistics.api.mui.DynamicItemSlot;
@@ -52,7 +51,6 @@ import com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis;
 import com.walhay.gregifiedenergistics.api.patterns.implementations.GhostCircuitPatternWrapper;
 import gregtech.api.capability.GregtechDataCodes;
 import gregtech.api.capability.IMultipleTankHandler;
-import gregtech.api.capability.INotifiableHandler;
 import gregtech.api.capability.impl.GhostCircuitItemStackHandler;
 import gregtech.api.metatileentity.multiblock.AbilityInstances;
 import gregtech.api.metatileentity.multiblock.IMultiblockAbilityPart;
@@ -90,14 +88,14 @@ import org.jetbrains.annotations.Nullable;
 import org.lwjgl.input.Keyboard;
 
 /** Shared processing-pattern storage, crafting, persistence and UI for ME multiblock inputs. */
-public abstract class MetaTileEntityPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemStack>
+public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingProvider<IAEItemStack>
 		implements IMultiblockAbilityPart<IItemHandlerModifiable> {
 	private boolean workingEnabled = true;
 
 	private final PatternHandler patternHandler;
 	private final boolean allowsFluids;
 
-	protected MetaTileEntityPatternBuffer(
+	protected MTEAbstractPatternProvider(
 			ResourceLocation metaTileEntityId, int tier, int patternSlots, boolean allowsFluids) {
 		super(metaTileEntityId, tier, false, IItemStorageChannel.class);
 		this.allowsFluids = allowsFluids;
@@ -109,6 +107,9 @@ public abstract class MetaTileEntityPatternBuffer extends MetaTileEntityCrafting
 	}
 
 	protected abstract String getTooltipKey();
+
+	protected abstract PatternBufferHandler createPatternBufferHandler(
+			PatternBufferStorage storage, GhostCircuitItemStackHandler circuitInventory);
 
 	protected boolean isPatternSupported(ICraftingPatternDetails pattern) {
 		return pattern != null;
@@ -374,7 +375,7 @@ public abstract class MetaTileEntityPatternBuffer extends MetaTileEntityCrafting
 		private final PatternContainer[] containers;
 
 		public PatternHandler(int size) {
-			super(MetaTileEntityPatternBuffer.this, size);
+			super(MTEAbstractPatternProvider.this, size);
 			containers = new PatternContainer[size];
 			for (int i = 0; i < size; ++i) containers[i] = new PatternContainer(i);
 		}
@@ -491,49 +492,42 @@ public abstract class MetaTileEntityPatternBuffer extends MetaTileEntityCrafting
 		private final int slot;
 		private final PatternBufferStorage storage;
 		private final GhostCircuitItemStackHandler circuitInventory;
-		private final PatternBufferDualHandler dualHandler;
-		private final PatternBufferItemHandler itemHandler;
-		private final INotifiableHandler notifiableHandler;
+		private final PatternBufferHandler handler;
 		private boolean pending;
 
 		public PatternContainer(int slot) {
 			this.slot = slot;
 			storage = new PatternBufferStorage(this::contentsChanged);
-			circuitInventory = new GhostCircuitItemStackHandler(MetaTileEntityPatternBuffer.this) {
+			circuitInventory = new GhostCircuitItemStackHandler(MTEAbstractPatternProvider.this) {
 				@Override
 				public void setCircuitValue(int config) {
 					super.setCircuitValue(config);
 					contentsChanged();
 				}
 			};
-			dualHandler = allowsFluids
-					? new PatternBufferDualHandler(storage.items(), circuitInventory, storage.fluids())
-					: null;
-			itemHandler = allowsFluids ? null : new PatternBufferItemHandler(storage.items(), circuitInventory);
-			notifiableHandler = allowsFluids ? dualHandler : itemHandler;
-			circuitInventory.addNotifiableMetaTileEntity(MetaTileEntityPatternBuffer.this);
+			handler = createPatternBufferHandler(storage, circuitInventory);
+			circuitInventory.addNotifiableMetaTileEntity(MTEAbstractPatternProvider.this);
 		}
 
 		private void contentsChanged() {
-			if (dualHandler != null) dualHandler.onContentsChanged();
-			if (itemHandler != null) itemHandler.onContentsChanged();
+			if (handler != null) handler.onContentsChanged();
 			if (getWorld() != null && !getWorld().isRemote) markDirty();
 		}
 
 		private void refreshDelegates() {
-			if (dualHandler != null) dualHandler.setFluidDelegate(storage.fluids());
+			handler.setFluidDelegate(storage.fluids());
 			contentsChanged();
 		}
 
 		private void notifyController(MultiblockControllerBase controller) {
-			notifiableHandler.addNotifiableMetaTileEntity(controller);
-			notifiableHandler.addToNotifiedList(controller, recipeInventory(), false);
+			handler.addNotifiableMetaTileEntity(controller);
+			handler.addToNotifiedList(controller, handler, false);
 		}
 
 		private void clearControllerNotifications(MultiblockControllerBase controller) {
-			notifiableHandler.removeNotifiableMetaTileEntity(controller);
-			controller.getNotifiedItemInputList().remove(recipeInventory());
-			if (dualHandler != null) controller.getNotifiedFluidInputList().remove(dualHandler);
+			handler.removeNotifiableMetaTileEntity(controller);
+			controller.getNotifiedItemInputList().remove(handler);
+			controller.getNotifiedFluidInputList().remove(handler);
 		}
 
 		private int[] shape(ICraftingPatternDetails pattern) {
@@ -589,7 +583,7 @@ public abstract class MetaTileEntityPatternBuffer extends MetaTileEntityCrafting
 		}
 
 		public IItemHandlerModifiable recipeInventory() {
-			return allowsFluids ? dualHandler : itemHandler;
+			return handler;
 		}
 
 		private void refundItems() {

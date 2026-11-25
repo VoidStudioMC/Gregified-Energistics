@@ -3,25 +3,25 @@ package com.walhay.gregifiedenergistics.common.metatileentities.multiblockparts;
 import appeng.api.networking.crafting.ICraftingPatternDetails;
 import appeng.api.storage.data.IAEItemStack;
 import com.glodblock.github.common.item.fake.FakeFluids;
-import com.walhay.gregifiedenergistics.api.metatileentity.MetaTileEntityPatternBuffer;
+import com.walhay.gregifiedenergistics.api.capability.PatternBufferItemHandler;
+import com.walhay.gregifiedenergistics.api.capability.PatternBufferStorage;
+import com.walhay.gregifiedenergistics.api.metatileentity.MTEAbstractPatternProvider;
 import com.walhay.gregifiedenergistics.client.render.GregifiedEnergisticsTextures;
 import gregtech.api.GTValues;
+import gregtech.api.capability.impl.GhostCircuitItemStackHandler;
 import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.api.metatileentity.interfaces.IGregTechTileEntity;
 import gregtech.client.renderer.texture.cube.SimpleOverlayRenderer;
 import java.util.List;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.World;
-import net.minecraftforge.common.util.Constants.NBT;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /** Tier-sized processing pattern buffer for item inputs only. */
-public class MTEMEPatternProvider extends MetaTileEntityPatternBuffer {
+public class MTEMEPatternProvider extends MTEAbstractPatternProvider {
 
 	public MTEMEPatternProvider(ResourceLocation metaTileEntityId, int tier) {
 		super(metaTileEntityId, tier, patternSlotsForTier(tier), false);
@@ -35,6 +35,12 @@ public class MTEMEPatternProvider extends MetaTileEntityPatternBuffer {
 	@Override
 	public MetaTileEntity createMetaTileEntity(IGregTechTileEntity holder) {
 		return new MTEMEPatternProvider(metaTileEntityId, getTier());
+	}
+
+	@Override
+	protected PatternBufferItemHandler createPatternBufferHandler(
+			PatternBufferStorage storage, GhostCircuitItemStackHandler circuitInventory) {
+		return new PatternBufferItemHandler(storage.items(), circuitInventory);
 	}
 
 	@Override
@@ -71,38 +77,5 @@ public class MTEMEPatternProvider extends MetaTileEntityPatternBuffer {
 		super.addInformation(stack, player, tooltip, advanced);
 		tooltip.add(I18n.format(getTooltipKey() + ".tooltip"));
 		tooltip.add(I18n.format(getTooltipKey() + ".capacity", getPatternSlotCount()));
-	}
-
-	@Override
-	public void readFromNBT(NBTTagCompound data) {
-		super.readFromNBT(migrateLegacyInventory(data));
-	}
-
-	static NBTTagCompound migrateLegacyInventory(NBTTagCompound data) {
-		NBTTagCompound patterns = data.getCompoundTag("PatternInventory");
-		if (patterns.hasKey("Containers", NBT.TAG_LIST) || !data.hasKey("ImportInventory", NBT.TAG_LIST)) return data;
-
-		NBTTagCompound migrated = data.copy();
-		NBTTagCompound items = new NBTTagCompound();
-		items.setTag(
-				"Items", data.getTagList("ImportInventory", NBT.TAG_COMPOUND).copy());
-		NBTTagCompound contents = new NBTTagCompound();
-		contents.setTag("Items", items);
-		contents.setBoolean("PendingReconfiguration", true);
-		NBTTagCompound circuit = new NBTTagCompound();
-		if (data.hasKey("GhostCircuit", NBT.TAG_ANY_NUMERIC)) {
-			circuit.setInteger("GhostCircuit", data.getInteger("GhostCircuit"));
-		}
-		contents.setTag("CircuitInventory", circuit);
-		NBTTagCompound container = new NBTTagCompound();
-		container.setInteger("Slot", 0);
-		container.setTag("Data", contents);
-		NBTTagList containers = new NBTTagList();
-		containers.appendTag(container);
-		NBTTagCompound migratedPatterns = patterns.copy();
-		migratedPatterns.setTag("Containers", containers);
-		migrated.setTag("PatternInventory", migratedPatterns);
-		migrated.removeTag("ImportInventory");
-		return migrated;
 	}
 }
