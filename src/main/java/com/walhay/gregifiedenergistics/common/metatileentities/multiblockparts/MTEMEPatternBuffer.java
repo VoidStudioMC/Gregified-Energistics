@@ -34,7 +34,7 @@ import com.cleanroommc.modularui.utils.Alignment;
 import com.cleanroommc.modularui.value.sync.*;
 import com.cleanroommc.modularui.widget.Widget;
 import com.cleanroommc.modularui.widgets.DynamicSyncedWidget;
-import com.cleanroommc.modularui.widgets.SlotGroupWidget;
+import com.cleanroommc.modularui.widgets.ListWidget;
 import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.layout.Grid;
 import com.cleanroommc.modularui.widgets.slot.FluidSlot;
@@ -44,7 +44,9 @@ import com.glodblock.github.common.item.fake.FakeFluids;
 import com.glodblock.github.common.item.fake.FakeItemRegister;
 import com.walhay.gregifiedenergistics.api.capability.AbstractPatternItemHandler;
 import com.walhay.gregifiedenergistics.api.capability.PatternBufferDualHandler;
+import com.walhay.gregifiedenergistics.api.capability.PatternBufferItemHandler;
 import com.walhay.gregifiedenergistics.api.capability.PatternBufferStorage;
+import com.walhay.gregifiedenergistics.api.capability.SegmentItemHandlerList;
 import com.walhay.gregifiedenergistics.api.metatileentity.MetaTileEntityCraftingProvider;
 import com.walhay.gregifiedenergistics.api.mui.DynamicItemSlot;
 import com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuiTextures;
@@ -53,8 +55,8 @@ import com.walhay.gregifiedenergistics.api.patterns.implementations.GhostCircuit
 import com.walhay.gregifiedenergistics.client.render.GregifiedEnergisticsTextures;
 import gregtech.api.capability.GregtechDataCodes;
 import gregtech.api.capability.IMultipleTankHandler;
+import gregtech.api.capability.INotifiableHandler;
 import gregtech.api.capability.impl.GhostCircuitItemStackHandler;
-import gregtech.api.capability.impl.ItemHandlerList;
 import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.api.metatileentity.interfaces.IGregTechTileEntity;
 import gregtech.api.metatileentity.multiblock.AbilityInstances;
@@ -75,7 +77,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import net.minecraft.client.resources.I18n;
-import net.minecraft.init.Items;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -99,26 +100,44 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 	private boolean workingEnabled = true;
 
 	private final PatternHandler patternHandler;
+	private final boolean allowsFluids;
 
 	public MTEMEPatternBuffer(ResourceLocation metaTileEntityId) {
-		super(metaTileEntityId, ZPM, false, IItemStorageChannel.class);
-		this.patternHandler = new PatternHandler(36);
+		this(metaTileEntityId, ZPM, 36, true);
+	}
+
+	protected MTEMEPatternBuffer(ResourceLocation metaTileEntityId, int tier, int patternSlots, boolean allowsFluids) {
+		super(metaTileEntityId, tier, false, IItemStorageChannel.class);
+		this.allowsFluids = allowsFluids;
+		this.patternHandler = new PatternHandler(patternSlots);
+	}
+
+	protected int getPatternSlotCount() {
+		return patternHandler.getSlots();
+	}
+
+	protected String getTooltipKey() {
+		return "gregifiedenergistics.machine.me_pattern_buffer";
+	}
+
+	protected boolean isPatternSupported(ICraftingPatternDetails pattern) {
+		return pattern != null;
 	}
 
 	@Override
 	public void addInformation(
 			ItemStack stack, @Nullable World player, @NotNull List<String> tooltip, boolean advanced) {
 		super.addInformation(stack, player, tooltip, advanced);
-		tooltip.add(I18n.format("gregifiedenergistics.machine.me_pattern_buffer.refund_inputs"));
+		tooltip.add(I18n.format(getTooltipKey() + ".refund_inputs"));
 		if (stack.hasTagCompound() && stack.getTagCompound().hasKey("PatternInventory")) {
-			tooltip.add(I18n.format("gregifiedenergistics.machine.me_pattern_buffer.retains_inventory"));
+			tooltip.add(I18n.format(getTooltipKey() + ".retains_inventory"));
 		}
 	}
 
 	@Override
 	public IItemHandlerModifiable getImportItems() {
-		return new ItemHandlerList(patternHandler.getContainers().stream()
-				.map(PatternContainer::dualInventory)
+		return new SegmentItemHandlerList(patternHandler.getContainers().stream()
+				.map(PatternContainer::recipeInventory)
 				.collect(Collectors.toList()));
 	}
 
@@ -217,6 +236,7 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 			ItemStack stack = inventory.getStackInSlot(i);
 			if (stack.isEmpty()) continue;
 			if (FakeFluids.isFluidFakeItem(stack)) {
+				if (!allowsFluids) return false;
 				FluidStack fluid = FakeItemRegister.getStack(stack);
 				if (fluid == null || fluid.amount <= 0) return false;
 				fluids.add(fluid.copy());
@@ -241,62 +261,63 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 	public ModularPanel buildUI(PosGuiData guiData, PanelSyncManager syncManager, UISettings settings) {
 		syncManager.registerSlotGroup("pattern_inv", 9);
 		IKey inventoryHint = IKey.lang("gregifiedenergistics.gui.buffer_inventory_hint");
+		int gridHeight = ((getPatternSlotCount() + 8) / 9) * SLOT_SIZE;
+		int viewportHeight = Math.min(7 * SLOT_SIZE, gridHeight);
 
 		return GregifiedEnergisticsGuis.createPanel(
-						this, GTGuis.DEFAULT_WIDTH, CONTENT_TOP + 4 * SLOT_SIZE + INVENTORY_SPACE)
-				.child(SlotGroupWidget.builder()
-						.slotGroup("pattern_inv")
-						.matrix("IIIIIIIII", "IIIIIIIII", "IIIIIIIII", "IIIIIIIII")
-						.key(
-								'I',
-								index -> new ItemSlot() {
-									private final IPanelHandler panel = syncManager.syncedPanel(
-											"buffer#" + index,
-											true,
-											(sh, ph) -> patternHandler
-													.getContainers()
-													.get(index)
-													.buildUI(sh, index));
-
-									@Override
-									public @NotNull Result onKeyPressed(char typedChar, int keyCode) {
-										if (keyCode == Keyboard.KEY_B) {
-											if (!getPanel().isOpen()) return Result.ACCEPT;
-											panel.togglePanel();
-											return Result.SUCCESS;
-										}
-										return Result.ACCEPT;
-									}
-
-									@Override
-									public void buildTooltip(ItemStack stack, RichTooltip tooltip) {
-										super.buildTooltip(stack, tooltip);
-										tooltip.addLine(inventoryHint);
-										PatternContainer container =
-												patternHandler.getContainers().get(index);
-
-										for (int i = 0;
-												i < container.inventory().getSlots();
-												++i) {
-											var item = container.inventory().getStackInSlot(i);
-											if (item.getItem() != Items.AIR) {
-												tooltip.addFromItem(item);
-											}
-										}
-									}
-								}.slot(SyncHandlers.itemSlot(patternHandler, index)
-												.changeListener((newItem, onlyAmountChanged, client, init) ->
-														patternHandler.onContentsChanged(index)))
-										.tooltip(tooltip -> tooltip.addLine(inventoryHint))
-										.background(
-												GTGuiTextures.SLOT,
-												GregifiedEnergisticsGuiTextures.PATTERN_OVERLAY
-														.asIcon()
-														.size(16)))
-						.build()
-						.disableSortButtons()
+						this, GTGuis.DEFAULT_WIDTH, CONTENT_TOP + viewportHeight + INVENTORY_SPACE)
+				.child(new ListWidget<>()
+						.width(9 * SLOT_SIZE + 8)
+						.height(viewportHeight)
 						.horizontalCenter()
-						.top(CONTENT_TOP));
+						.top(CONTENT_TOP)
+						.child(new Grid()
+								.coverChildren()
+								.minElementMargin(0, 0)
+								.minColWidth(SLOT_SIZE)
+								.minRowHeight(SLOT_SIZE)
+								.horizontalCenter()
+								.mapTo(
+										9,
+										getPatternSlotCount(),
+										index -> patternSlot(syncManager, index, inventoryHint))));
+	}
+
+	private ItemSlot patternSlot(PanelSyncManager syncManager, int index, IKey inventoryHint) {
+		return new ItemSlot() {
+			private final IPanelHandler panel = syncManager.syncedPanel(
+					"buffer#" + index,
+					true,
+					(sh, ph) -> patternHandler.getContainers().get(index).buildUI(sh, index));
+
+			@Override
+			public @NotNull Result onKeyPressed(char typedChar, int keyCode) {
+				if (keyCode == Keyboard.KEY_B) {
+					if (!getPanel().isOpen()) return Result.ACCEPT;
+					panel.togglePanel();
+					return Result.SUCCESS;
+				}
+				return Result.ACCEPT;
+			}
+
+			@Override
+			public void buildTooltip(ItemStack stack, RichTooltip tooltip) {
+				super.buildTooltip(stack, tooltip);
+				tooltip.addLine(inventoryHint);
+				PatternContainer container = patternHandler.getContainers().get(index);
+				for (int i = 0; i < container.inventory().getSlots(); ++i) {
+					ItemStack item = container.inventory().getStackInSlot(i);
+					if (!item.isEmpty()) tooltip.addFromItem(item);
+				}
+			}
+		}.slot(SyncHandlers.itemSlot(patternHandler, index)
+						.slotGroup("pattern_inv")
+						.changeListener(
+								(newItem, onlyAmountChanged, client, init) -> patternHandler.onContentsChanged(index)))
+				.tooltip(tooltip -> tooltip.addLine(inventoryHint))
+				.background(
+						GTGuiTextures.SLOT,
+						GregifiedEnergisticsGuiTextures.PATTERN_OVERLAY.asIcon().size(16));
 	}
 
 	@Override
@@ -304,7 +325,7 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 		return new MTEMEPatternBuffer(metaTileEntityId);
 	}
 
-	private SimpleOverlayRenderer getOverlay() {
+	protected SimpleOverlayRenderer getOverlay() {
 		return isOnline
 				? GregifiedEnergisticsTextures.ME_PATTERN_BUFFER_ACTIVE
 				: GregifiedEnergisticsTextures.ME_PATTERN_BUFFER;
@@ -324,7 +345,7 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 	@Override
 	public void registerAbilities(@NotNull AbilityInstances ability) {
 		patternHandler.getContainers().stream()
-				.map(PatternContainer::dualInventory)
+				.map(PatternContainer::recipeInventory)
 				.forEach(ability::add);
 	}
 
@@ -408,9 +429,16 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 		@Override
 		protected ICraftingPatternDetails getPatternFromStack(ItemStack stack) {
 			if (stack.getItem() instanceof ItemEncodedPattern encodedPattern) {
-				return GhostCircuitPatternWrapper.wrap(encodedPattern.getPatternForItem(stack, getWorld()));
+				ICraftingPatternDetails pattern =
+						GhostCircuitPatternWrapper.wrap(encodedPattern.getPatternForItem(stack, getWorld()));
+				return isPatternSupported(pattern) ? pattern : null;
 			}
 			return null;
+		}
+
+		@Override
+		public boolean isItemValid(int slot, @NotNull ItemStack stack) {
+			return super.isItemValid(slot, stack) && (allowsFluids || getPatternFromStack(stack) != null);
 		}
 
 		@Override
@@ -483,6 +511,8 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 		private final PatternBufferStorage storage;
 		private final GhostCircuitItemStackHandler circuitInventory;
 		private final PatternBufferDualHandler dualHandler;
+		private final PatternBufferItemHandler itemHandler;
+		private final INotifiableHandler notifiableHandler;
 		private boolean pending;
 
 		public PatternContainer(int slot) {
@@ -495,29 +525,34 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 					contentsChanged();
 				}
 			};
-			dualHandler = new PatternBufferDualHandler(storage.items(), circuitInventory, storage.fluids());
+			dualHandler = allowsFluids
+					? new PatternBufferDualHandler(storage.items(), circuitInventory, storage.fluids())
+					: null;
+			itemHandler = allowsFluids ? null : new PatternBufferItemHandler(storage.items(), circuitInventory);
+			notifiableHandler = allowsFluids ? dualHandler : itemHandler;
 			circuitInventory.addNotifiableMetaTileEntity(MTEMEPatternBuffer.this);
 		}
 
 		private void contentsChanged() {
 			if (dualHandler != null) dualHandler.onContentsChanged();
+			if (itemHandler != null) itemHandler.onContentsChanged();
 			if (getWorld() != null && !getWorld().isRemote) markDirty();
 		}
 
 		private void refreshDelegates() {
-			dualHandler.setFluidDelegate(storage.fluids());
+			if (dualHandler != null) dualHandler.setFluidDelegate(storage.fluids());
 			contentsChanged();
 		}
 
 		private void notifyController(MultiblockControllerBase controller) {
-			dualHandler.addNotifiableMetaTileEntity(controller);
-			dualHandler.addToNotifiedList(controller, dualHandler, false);
+			notifiableHandler.addNotifiableMetaTileEntity(controller);
+			notifiableHandler.addToNotifiedList(controller, recipeInventory(), false);
 		}
 
 		private void clearControllerNotifications(MultiblockControllerBase controller) {
-			dualHandler.removeNotifiableMetaTileEntity(controller);
-			controller.getNotifiedItemInputList().remove(dualHandler);
-			controller.getNotifiedFluidInputList().remove(dualHandler);
+			notifiableHandler.removeNotifiableMetaTileEntity(controller);
+			controller.getNotifiedItemInputList().remove(recipeInventory());
+			if (dualHandler != null) controller.getNotifiedFluidInputList().remove(dualHandler);
 		}
 
 		private int[] shape(ICraftingPatternDetails pattern) {
@@ -572,8 +607,8 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 			return storage.items();
 		}
 
-		public IItemHandlerModifiable dualInventory() {
-			return dualHandler;
+		public IItemHandlerModifiable recipeInventory() {
+			return allowsFluids ? dualHandler : itemHandler;
 		}
 
 		private void refundItems() {
@@ -601,6 +636,7 @@ public class MTEMEPatternBuffer extends MetaTileEntityCraftingProvider<IAEItemSt
 		}
 
 		private void refundFluids() {
+			if (!allowsFluids) return;
 			if (getWorld() == null || getWorld().isRemote || getProxy() == null) return;
 			try {
 				IFluidStorageChannel channel = AEApi.instance().storage().getStorageChannel(IFluidStorageChannel.class);

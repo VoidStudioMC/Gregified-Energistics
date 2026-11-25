@@ -33,7 +33,7 @@ GT, AE2 and AE2FC are required at the listed versions because their recipe and c
 | ME Assembly Line Bus | LuV | Provides recipes from Data Sticks or encoded AE2 patterns; distributes ingredients across ordered input buses | Assembly Line, scanner research |
 | ME Assembly Line Optical Bus | ZPM | Provides Assembly Line recipes from a Data Bank through optical pipes | Assembly Line upgrade, Research Station |
 | ME Pattern Buffer | ZPM | Holds 36 processing patterns and their item/fluid inputs for compatible GregTech recipe multiblocks | Assembly Line, Research Station |
-| ME Pattern Provider | IV–UHV | Provides one processing pattern and stores its inputs in a tier-sized inventory; includes ghost circuit and auto-collapse controls | IV in the assembler; higher tiers upgrade the previous provider on the Assembly Line |
+| ME Pattern Provider | IV–UHV | Holds 36/45/63/81/99 processing patterns by tier, with a separate unlimited item buffer and ghost circuit per pattern; supports items only | IV in the assembler; higher tiers upgrade the previous provider on the Assembly Line |
 
 The buffer and providers require a multiblock that accepts their import-item ability to act as input buses. The UHV provider recipe uses UV mechanical components and UV recipe voltage, plus a UHV hull and circuits, so it is available with GregTech high-tier mode disabled. Research consumes the supplied machine; research and upgrade recipes require an item without saved NBT.
 
@@ -41,11 +41,13 @@ Connect the optical bus to a Data Bank's optical transmitter through optical pip
 
 Assembly Line buses include every recipe fluid in the AE2 crafting plan, including recipes from Data Sticks and the optical Data Bank. Fluids appear in the order preview and can be autocrafted through other processing patterns. Encoded AE2FC processing patterns can specify items and fluids together: items go to input buses in item order, fluids to input hatches in fluid order. Each fluid input requires its corresponding hatch to accept the full amount before the bus accepts a craft. The bus uses fluids supplied by the crafting CPU; fluid ordering is always enabled.
 
-In the Pattern Buffer GUI, hover over a pattern slot and press **B** to inspect its inputs. When a pattern is removed or changed, its remaining inputs are returned to ME. If ME cannot accept them, the container stays pending until they can be returned or removed through the GUI. The replacement pattern starts accepting crafts once the old contents are empty.
+Pattern Buffers and Pattern Providers display nine pattern slots per row. Hover over a pattern slot and press **B** to inspect its inputs and configure its ghost circuit. When a pattern is removed or changed, its remaining inputs are returned to ME. If ME cannot accept them, the container stays pending until they can be returned or removed through the GUI. The replacement pattern starts accepting crafts once the old contents are empty. Providers reject patterns with fluid inputs or outputs.
 
 ## Persistence and updating
 
-Dismantling a Pattern Buffer keeps its patterns, items and fluids in the dropped machine item. Assembly Line buses retain their pending item queue and CPU-supplied fluids in their dropped item. Place the item again to recover its contents. Large item quantities use an integer in saved NBT; the GUI shows ordinary stack sizes and reports the full stored count separately.
+Dismantling a Pattern Buffer keeps its patterns, items and fluids in the dropped machine item. Pattern Providers retain their patterns and items in the same way. Assembly Line buses retain their pending item queue and CPU-supplied fluids in their dropped item. Place the item again to recover its contents. Large item quantities use an integer in saved NBT; the GUI shows ordinary stack sizes and reports the full stored count separately.
+
+Existing single-pattern providers retain their pattern in the first slot when updated. Their old input inventory moves into that slot's buffer and is returned to ME before the pattern accepts new crafts; if the network cannot accept the items, they remain available through the buffer GUI.
 
 When updating to fluid-aware Assembly Line crafting, saved recipe jobs that did not reserve fluids are canceled through AE2 and must be ordered again. Already extracted fluid remainders in buses are retained; old unfulfilled direct-extraction requests are discarded. Ingredients already delivered to the Assembly Line remain in its buses and hatches.
 

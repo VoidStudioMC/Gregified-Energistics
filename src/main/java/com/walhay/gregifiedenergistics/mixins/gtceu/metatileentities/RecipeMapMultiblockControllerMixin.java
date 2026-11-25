@@ -1,6 +1,7 @@
 package com.walhay.gregifiedenergistics.mixins.gtceu.metatileentities;
 
 import com.walhay.gregifiedenergistics.api.capability.PatternBufferDualHandler;
+import com.walhay.gregifiedenergistics.api.capability.PatternBufferItemHandler;
 import com.walhay.gregifiedenergistics.api.capability.SegmentItemHandlerList;
 import gregtech.api.capability.IMultipleTankHandler;
 import gregtech.api.capability.impl.ItemHandlerList;
@@ -43,11 +44,13 @@ public abstract class RecipeMapMultiblockControllerMixin {
 		gregified$bufferTanks = new IdentityHashMap<>();
 		if (this.inputInventory instanceof ItemHandlerList list) {
 			Collection<IItemHandler> handlers = list.getBackingHandlers();
+			boolean hasDynamicItems = false;
 			for (IItemHandler handler : handlers) {
+				if (handler instanceof PatternBufferItemHandler) hasDynamicItems = true;
 				if (handler instanceof PatternBufferDualHandler buffer)
 					gregified$bufferTanks.put(buffer, buffer.getFluidTanks());
 			}
-			if (!gregified$bufferTanks.isEmpty()) {
+			if (hasDynamicItems || !gregified$bufferTanks.isEmpty()) {
 				this.inputInventory = new SegmentItemHandlerList(handlers);
 			}
 		}
