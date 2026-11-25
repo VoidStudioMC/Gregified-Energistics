@@ -3,6 +3,7 @@ package com.walhay.gregifiedenergistics.common.metatileentities.multiblockparts;
 import appeng.api.networking.crafting.ICraftingPatternDetails;
 import appeng.api.storage.data.IAEItemStack;
 import com.glodblock.github.common.item.fake.FakeFluids;
+import com.walhay.gregifiedenergistics.api.metatileentity.MetaTileEntityPatternBuffer;
 import com.walhay.gregifiedenergistics.client.render.GregifiedEnergisticsTextures;
 import gregtech.api.GTValues;
 import gregtech.api.metatileentity.MetaTileEntity;
@@ -20,7 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /** Tier-sized processing pattern buffer for item inputs only. */
-public class MTEMEPatternProvider extends MTEMEPatternBuffer {
+public class MTEMEPatternProvider extends MetaTileEntityPatternBuffer {
 
 	public MTEMEPatternProvider(ResourceLocation metaTileEntityId, int tier) {
 		super(metaTileEntityId, tier, patternSlotsForTier(tier), false);
