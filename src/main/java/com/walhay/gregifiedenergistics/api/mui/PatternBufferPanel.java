@@ -193,9 +193,9 @@ public final class PatternBufferPanel {
 		};
 	}
 
-	public PopupPanel buildUI(PanelSyncManager syncManager, int index, Runnable refundItems) {
-		String refundItemsAction = "refund_items";
-		syncManager.registerSyncedAction(refundItemsAction, false, true, buffer -> refundItems.run());
+	public PopupPanel buildUI(PanelSyncManager syncManager, int index, Runnable refundContents) {
+		String refundAction = "refund_contents";
+		syncManager.registerSyncedAction(refundAction, false, true, buffer -> refundContents.run());
 
 		DynamicSyncHandler contents = new DynamicSyncHandler().widgetProvider(this::buildContents);
 		syncManager.onServerTick(new Runnable() {
@@ -238,10 +238,10 @@ public final class PatternBufferPanel {
 						.right(5)
 						.top(19)
 						.overlay(GuiTextures.UPLOAD.asIcon().size(12))
-						.addTooltipLine(IKey.lang("gregifiedenergistics.gui.buffer_refund_items"))
+						.addTooltipLine(IKey.lang("gregifiedenergistics.gui.buffer_refund_contents"))
 						.onMousePressed(mouseButton -> {
 							if (mouseButton != 0) return false;
-							syncManager.callSyncedAction(refundItemsAction);
+							syncManager.callSyncedAction(refundAction);
 							return true;
 						}));
 	}

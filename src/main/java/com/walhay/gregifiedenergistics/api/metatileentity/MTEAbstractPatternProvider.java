@@ -273,7 +273,7 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 								buffer.circuitInventory,
 								() -> buffer.pending,
 								buffer::resizeClientStorage)
-						.buildUI(sh, index, buffer::refundItems);
+						.buildUI(sh, index, buffer::refundContents);
 			});
 
 			@Override
@@ -574,8 +574,7 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 			if (getWorld() != null && getWorld().isRemote) {
 				clearClientContents();
 			} else {
-				refundItems();
-				refundFluids();
+				refundContents();
 			}
 			configure(pattern);
 			contentsChanged();
@@ -584,8 +583,7 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 		/** A replacement pattern stays unavailable to AE2 until the previous inputs leave the buffer. */
 		private boolean retryReconfiguration() {
 			if (!pending) return false;
-			refundItems();
-			refundFluids();
+			refundContents();
 			return storage.isEmpty() && configure(patternHandler.getPatternDetails(slot));
 		}
 
@@ -595,6 +593,11 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 
 		public IItemHandlerModifiable recipeInventory() {
 			return handler;
+		}
+
+		private void refundContents() {
+			refundItems();
+			refundFluids();
 		}
 
 		private void refundItems() {
