@@ -16,17 +16,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(BlockOpticalPipe.class)
 public class BlockOpticalPipeMixin {
 
-	@Inject(
-			method = "canPipeConnectToBlock",
-			at = @At(value = "RETURN", ordinal = 2),
-			remap = false,
-			cancellable = true)
+	@Inject(method = "canPipeConnectToBlock", at = @At("RETURN"), remap = false, cancellable = true)
 	private void canPipeConnectToBlock(
 			IPipeTile<OpticalPipeType, OpticalPipeProperties> selfTile,
 			EnumFacing side,
 			@Nullable TileEntity tile,
 			CallbackInfoReturnable<Boolean> cir) {
-		if (tile != null
+		if (!cir.getReturnValueZ()
+				&& tile != null
 				&& tile.hasCapability(GregifiedEnergisticsCapabilities.CAPABILITY_RECIPE_HANDLER, side.getOpposite()))
 			cir.setReturnValue(true);
 	}
