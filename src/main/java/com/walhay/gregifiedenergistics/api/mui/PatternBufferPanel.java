@@ -6,6 +6,7 @@ import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.P
 import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.SLOT_SIZE;
 
 import com.cleanroommc.modularui.api.drawable.IKey;
+import com.cleanroommc.modularui.drawable.GuiTextures;
 import com.cleanroommc.modularui.screen.RichTooltip;
 import com.cleanroommc.modularui.utils.Alignment;
 import com.cleanroommc.modularui.value.sync.DynamicSyncHandler;
@@ -210,10 +211,10 @@ public final class PatternBufferPanel {
 			}
 		});
 		int popupWidth = MIN_WIDTH;
-		int popupHeight = 192;
+		int popupHeight = 180;
 		int bodyWidth = popupWidth - 2 * PADDING;
-		int bodyTop = 28;
-		int bodyHeight = popupHeight - bodyTop - SLOT_SIZE - 2 * PADDING;
+		int bodyTop = 34;
+		int bodyHeight = popupHeight - bodyTop - 2 * PADDING;
 		int headerWidth = popupWidth - 40; // reserve the popup close button area
 
 		return (PopupPanel) GTGuis.createPopupPanel("buffer#" + index, popupWidth, popupHeight)
@@ -233,10 +234,11 @@ public final class PatternBufferPanel {
 						.size(bodyWidth, bodyHeight)
 						.syncHandler(contents))
 				.child(new ButtonWidget<>()
-						.size(140, SLOT_SIZE)
-						.horizontalCenter()
-						.bottom(PADDING)
-						.overlay(IKey.lang("gregifiedenergistics.gui.buffer_refund_items"))
+						.size(14)
+						.right(5)
+						.top(19)
+						.overlay(GuiTextures.UPLOAD.asIcon().size(12))
+						.addTooltipLine(IKey.lang("gregifiedenergistics.gui.buffer_refund_items"))
 						.onMousePressed(mouseButton -> {
 							if (mouseButton != 0) return false;
 							syncManager.callSyncedAction(refundItemsAction);
