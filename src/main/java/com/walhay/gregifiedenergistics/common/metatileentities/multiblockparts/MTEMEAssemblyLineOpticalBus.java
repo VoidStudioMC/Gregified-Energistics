@@ -11,6 +11,7 @@ import codechicken.lib.vec.Matrix4;
 import com.walhay.gregifiedenergistics.api.capability.GregifiedEnergisticsCapabilities;
 import com.walhay.gregifiedenergistics.api.capability.INetRecipeHandler;
 import com.walhay.gregifiedenergistics.api.capability.IOpticalNetRecipeHandler;
+import com.walhay.gregifiedenergistics.api.metatileentity.MTEAbstractAssemblyLineBus;
 import com.walhay.gregifiedenergistics.api.patterns.implementations.RecipePatternHelper;
 import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.api.metatileentity.interfaces.IGregTechTileEntity;

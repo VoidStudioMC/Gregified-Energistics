@@ -1,4 +1,4 @@
-package com.walhay.gregifiedenergistics.common.metatileentities.multiblockparts;
+package com.walhay.gregifiedenergistics.api.metatileentity;
 
 import static com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig.MAX_SLOTS;
 import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuiTextures.BLOCKING_MODE;
@@ -42,7 +42,6 @@ import com.cleanroommc.modularui.widgets.layout.Grid;
 import com.cleanroommc.modularui.widgets.slot.ItemSlot;
 import com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig;
 import com.walhay.gregifiedenergistics.api.capability.AssemblyLineInputQueue;
-import com.walhay.gregifiedenergistics.api.metatileentity.MetaTileEntityCraftingProvider;
 import com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis;
 import com.walhay.gregifiedenergistics.api.patterns.AbstractPatternHelper;
 import com.walhay.gregifiedenergistics.api.patterns.ISubstitutionNotifiable;
