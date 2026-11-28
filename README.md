@@ -45,13 +45,13 @@ Pattern Buffers and Pattern Providers display nine pattern slots per row. Hover 
 
 ## Persistence and updating
 
-Dismantling a Pattern Buffer keeps its patterns, items and fluids in the dropped machine item. Pattern Providers retain their patterns and items in the same way. Assembly Line buses retain their pending item queue and CPU-supplied fluids in their dropped item. Place the item again to recover its contents. Large item quantities use an integer in saved NBT; the GUI shows ordinary stack sizes and reports the full stored count separately.
+Dismantling a Pattern Buffer keeps its patterns, items and fluids in the dropped machine item. Pattern Providers retain their patterns and items in the same way. Assembly Line buses retain their pending item queue and CPU-supplied fluids in their dropped item. Place the item again to recover its contents. Large item quantities use an integer in saved NBT; the GUI shows ordinary stack sizes and reports the full stored count separately. Quantities already lost by the old byte-sized item serializer cannot be reconstructed.
 
 Existing single-pattern providers retain their pattern in the first slot when updated. Their old input inventory moves into that slot's buffer and is returned to ME before the pattern accepts new crafts. If the network cannot accept the items, they remain available through the buffer GUI.
 
-When updating to fluid-aware Assembly Line crafting, saved recipe jobs that did not reserve fluids are canceled through AE2 and must be ordered again. Already extracted fluid remainders in buses are retained; old unfulfilled direct-extraction requests are discarded. Ingredients already delivered to the Assembly Line remain in its buses and hatches.
+Finish or cancel active AE2 crafting jobs before updating from an older version. Current jobs persist recipe identities, selected substitutions and ghost circuit settings.
 
-When updating from the older save format, crafting jobs containing only a numeric recipe ID or an unmarked processing pattern with an integrated circuit are canceled through AE2 after CPU initialization. CPU-owned inputs return through AE2; inputs already delivered to machines remain there. New jobs persist recipe identities, selected substitutions and ghost circuit wrappers. Quantities already lost by the old byte-sized item serializer cannot be reconstructed.
+Already extracted fluid remainders in buses are retained. Old unfulfilled direct-extraction requests are discarded. Ingredients already delivered to the Assembly Line remain in its buses and hatches.
 
 ## Configuration
 

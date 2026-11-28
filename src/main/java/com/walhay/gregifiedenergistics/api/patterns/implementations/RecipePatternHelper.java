@@ -101,7 +101,7 @@ public class RecipePatternHelper extends AbstractPatternHelper {
 	@Nullable public static RecipePatternHelper readFromNBT(NBTTagCompound data, ItemStack pattern) {
 		NBTTagList items = data.getTagList("Inputs", NBT.TAG_COMPOUND);
 		NBTTagList fluids = data.getTagList("FluidInputs", NBT.TAG_COMPOUND);
-		// Older jobs never reserved their fluid inputs in the CPU. Replanning must include them.
+		// A fluid-aware plan must confirm that the CPU reserved its fluid inputs.
 		if (!fluids.isEmpty() && !data.getBoolean("FluidInputsInCrafting")) return null;
 		ItemStack[] savedItems = new ItemStack[items.tagCount()];
 		Arrays.setAll(savedItems, i -> InfiniteItemStackHandler.readStack(items.getCompoundTagAt(i)));
