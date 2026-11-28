@@ -1,9 +1,8 @@
-package com.walhay.gregifiedenergistics.common.metatileentities.multiblockparts;
+package com.walhay.gregifiedenergistics.api.capability;
 
 import static com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig.MAX_SLOTS;
 
 import appeng.util.InventoryAdaptor;
-import com.walhay.gregifiedenergistics.api.capability.InfiniteItemStackHandler;
 import com.walhay.gregifiedenergistics.api.util.AssemblyLineFluidTransfer;
 import com.walhay.gregifiedenergistics.api.util.AssemblyLineInputs;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -19,10 +18,10 @@ import net.minecraftforge.fluids.IFluidTank;
  * Owns inputs accepted from the crafting CPU until the corresponding buses or hatches receive them. Destination indices
  * stay fixed when the multiblock detaches or a transfer only partially succeeds.
  */
-final class AssemblyLineInputQueue {
-	static final String ITEM_TAG = "ItemToSend";
-	static final String FLUID_TAG = "FluidToSend";
-	static final String SLOT_TAG = "Slot";
+public final class AssemblyLineInputQueue {
+	public static final String ITEM_TAG = "ItemToSend";
+	public static final String FLUID_TAG = "FluidToSend";
+	public static final String SLOT_TAG = "Slot";
 	private static final String LEGACY_OWNED_FLUID_TAG = "ExtractedFluids";
 	private static final String FLUID_QUEUE_VERSION_TAG = "FluidQueueVersion";
 	private static final int OWNED_FLUID_QUEUE_VERSION = 1;
@@ -31,27 +30,27 @@ final class AssemblyLineInputQueue {
 	private final Int2ObjectOpenHashMap<FluidStack> fluids = new Int2ObjectOpenHashMap<>();
 	private final Runnable contentsChanged;
 
-	AssemblyLineInputQueue(Runnable contentsChanged) {
+	public AssemblyLineInputQueue(Runnable contentsChanged) {
 		this.contentsChanged = contentsChanged;
 	}
 
-	boolean hasItems() {
+	public boolean hasItems() {
 		return !items.isEmpty();
 	}
 
-	boolean hasFluids() {
+	public boolean hasFluids() {
 		return !fluids.isEmpty();
 	}
 
 	/** Takes ownership of the CPU inputs after the bus has checked all destinations. */
-	void enqueue(AssemblyLineInputs inputs) {
+	public void enqueue(AssemblyLineInputs inputs) {
 		for (int slot = 0; slot < inputs.items.size(); ++slot) items.put(slot, inputs.items.get(slot));
 		for (int slot = 0; slot < inputs.fluids.size(); ++slot) fluids.put(slot, inputs.fluids.get(slot));
 		if (!inputs.items.isEmpty() || !inputs.fluids.isEmpty()) contentsChanged.run();
 	}
 
 	/** Missing destinations leave their inputs queued for the next delivery attempt. */
-	void deliverItems(List<InventoryAdaptor> destinations) {
+	public void deliverItems(List<InventoryAdaptor> destinations) {
 		var iterator = items.int2ObjectEntrySet().iterator();
 		boolean changed = false;
 		while (iterator.hasNext()) {
@@ -76,7 +75,7 @@ final class AssemblyLineInputQueue {
 		if (changed) contentsChanged.run();
 	}
 
-	void deliverFluids(List<IFluidTank> destinations) {
+	public void deliverFluids(List<IFluidTank> destinations) {
 		var iterator = fluids.int2ObjectEntrySet().iterator();
 		while (iterator.hasNext()) {
 			var entry = iterator.next();
@@ -90,11 +89,11 @@ final class AssemblyLineInputQueue {
 		}
 	}
 
-	static boolean hasSavedInputs(NBTTagCompound data) {
+	public static boolean hasSavedInputs(NBTTagCompound data) {
 		return data.hasKey(ITEM_TAG) || data.hasKey(FLUID_TAG) || data.hasKey(LEGACY_OWNED_FLUID_TAG);
 	}
 
-	void writeToNBT(NBTTagCompound data) {
+	public void writeToNBT(NBTTagCompound data) {
 		NBTTagList itemEntries = new NBTTagList();
 		for (var entry : items.int2ObjectEntrySet()) {
 			NBTTagCompound item = InfiniteItemStackHandler.writeStack(entry.getValue());
@@ -122,7 +121,7 @@ final class AssemblyLineInputQueue {
 		data.removeTag(LEGACY_OWNED_FLUID_TAG);
 	}
 
-	void readFromNBT(NBTTagCompound data) {
+	public void readFromNBT(NBTTagCompound data) {
 		items.clear();
 		fluids.clear();
 		NBTTagList itemEntries = data.getTagList(ITEM_TAG, NBT.TAG_COMPOUND);

@@ -1,11 +1,10 @@
-package com.walhay.gregifiedenergistics.common.metatileentities.multiblockparts;
+package com.walhay.gregifiedenergistics.api.capability;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import appeng.util.inv.AdaptorItemHandler;
-import com.walhay.gregifiedenergistics.api.capability.InfiniteItemStackHandler;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
