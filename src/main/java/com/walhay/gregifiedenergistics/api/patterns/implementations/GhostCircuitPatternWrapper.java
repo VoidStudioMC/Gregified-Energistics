@@ -16,7 +16,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.NotNull;
 
-/** GhostCircuitPatternHelper */
+/** Uses a pattern's integrated circuit as a machine setting and omits it from AE2's inputs. */
 public class GhostCircuitPatternWrapper extends AbstractPatternHelper {
 
 	@NotNull private final ICraftingPatternDetails pattern;

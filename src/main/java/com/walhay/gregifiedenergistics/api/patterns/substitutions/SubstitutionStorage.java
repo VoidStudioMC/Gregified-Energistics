@@ -15,6 +15,7 @@ import net.minecraft.network.PacketBuffer;
 import net.minecraftforge.common.capabilities.Capability;
 import org.jetbrains.annotations.NotNull;
 
+/** Persists the provider's substitution choices and synchronizes candidate lists to the GUI. */
 public class SubstitutionStorage extends MTETrait implements ISubstitutionStorage {
 	public static final String STORAGE_TAG = "SubstitutionStorage";
 	private final SubstitutionData data = new SubstitutionData();
@@ -31,8 +32,7 @@ public class SubstitutionStorage extends MTETrait implements ISubstitutionStorag
 
 	@Override
 	public void setOption(String name, int option) {
-		List<ItemStack> candidates = data.getCandidates(name);
-		if (option < 0 || option >= candidates.size()) return;
+		if (!data.hasCandidate(name, option)) return;
 		long revision = data.getRevision();
 		data.setOption(name, option);
 		if (revision != data.getRevision()) {
