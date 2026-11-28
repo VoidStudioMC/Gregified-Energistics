@@ -15,8 +15,11 @@ import gregtech.client.renderer.texture.cube.SimpleOverlayRenderer;
 import java.util.List;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.World;
+import net.minecraftforge.common.util.Constants.NBT;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -77,5 +80,48 @@ public class MTEMEPatternProvider extends MTEAbstractPatternProvider {
 		super.addInformation(stack, player, tooltip, advanced);
 		tooltip.add(I18n.format(getTooltipKey() + ".tooltip"));
 		tooltip.add(I18n.format(getTooltipKey() + ".capacity", getPatternSlotCount()));
+	}
+
+	// TODO: Remove this override, LegacyInventory and PatternProviderMigrationTest after the next patch.
+	@Override
+	public void readFromNBT(NBTTagCompound data) {
+		super.readFromNBT(LegacyInventory.migrate(data));
+	}
+
+	static final class LegacyInventory {
+		private LegacyInventory() {}
+
+		static NBTTagCompound migrate(NBTTagCompound data) {
+			NBTTagCompound patterns = data.getCompoundTag("PatternInventory");
+			if (patterns.hasKey("Containers", NBT.TAG_LIST) || !data.hasKey("ImportInventory", NBT.TAG_LIST))
+				return data;
+
+			NBTTagCompound items = new NBTTagCompound();
+			items.setTag(
+					"Items",
+					data.getTagList("ImportInventory", NBT.TAG_COMPOUND).copy());
+			NBTTagCompound contents = new NBTTagCompound();
+			contents.setTag("Items", items);
+			contents.setBoolean("PendingReconfiguration", true);
+			if (data.hasKey("GhostCircuit", NBT.TAG_ANY_NUMERIC)) {
+				NBTTagCompound circuit = new NBTTagCompound();
+				circuit.setInteger("GhostCircuit", data.getInteger("GhostCircuit"));
+				contents.setTag("CircuitInventory", circuit);
+				contents.setBoolean("PreserveCircuitOnReconfiguration", true);
+			}
+
+			NBTTagCompound container = new NBTTagCompound();
+			container.setInteger("Slot", 0);
+			container.setTag("Data", contents);
+			NBTTagList containers = new NBTTagList();
+			containers.appendTag(container);
+
+			NBTTagCompound migrated = data.copy();
+			NBTTagCompound migratedPatterns = migrated.getCompoundTag("PatternInventory");
+			migratedPatterns.setTag("Containers", containers);
+			migrated.setTag("PatternInventory", migratedPatterns);
+			migrated.removeTag("ImportInventory");
+			return migrated;
+		}
 	}
 }

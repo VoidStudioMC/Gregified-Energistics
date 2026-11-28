@@ -494,6 +494,7 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 		private final GhostCircuitItemStackHandler circuitInventory;
 		private final PatternBufferHandler handler;
 		private boolean pending;
+		private boolean preserveCircuitOnReconfiguration;
 
 		public PatternContainer(int slot) {
 			this.slot = slot;
@@ -549,8 +550,11 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 				return false;
 			}
 			pending = false;
-			circuitInventory.setCircuitValue(
-					pattern instanceof GhostCircuitPatternWrapper wrapper ? wrapper.getCircuitValue() : -1);
+			if (!preserveCircuitOnReconfiguration) {
+				circuitInventory.setCircuitValue(
+						pattern instanceof GhostCircuitPatternWrapper wrapper ? wrapper.getCircuitValue() : -1);
+			}
+			preserveCircuitOnReconfiguration = false;
 			refreshDelegates();
 			return true;
 		}
@@ -561,6 +565,7 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 		}
 
 		private void requestPattern(ICraftingPatternDetails pattern) {
+			preserveCircuitOnReconfiguration = false;
 			if (getWorld() != null && getWorld().isRemote) {
 				clearClientContents();
 			} else {
@@ -639,6 +644,7 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 			circuitInventory.write(circuit);
 			data.setTag("CircuitInventory", circuit);
 			data.setBoolean("PendingReconfiguration", pending);
+			if (preserveCircuitOnReconfiguration) data.setBoolean("PreserveCircuitOnReconfiguration", true);
 			return data;
 		}
 
@@ -646,8 +652,7 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 		public void deserializeNBT(NBTTagCompound data) {
 			storage.deserializeNBT(data);
 			refreshDelegates();
-			if (data.hasKey("CircuitInventory", NBT.TAG_COMPOUND))
-				circuitInventory.read(data.getCompoundTag("CircuitInventory"));
+			preserveCircuitOnReconfiguration = data.getBoolean("PreserveCircuitOnReconfiguration");
 			ICraftingPatternDetails pattern = patternHandler.getPatternDetails(slot);
 			int[] shape = shape(pattern);
 			pending = data.getBoolean("PendingReconfiguration")
@@ -655,6 +660,8 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 					|| storage.items().getSlots() != shape[0]
 					|| storage.fluids().getTanks() != shape[1];
 			if (storage.isEmpty()) configure(pattern);
+			if (data.hasKey("CircuitInventory", NBT.TAG_COMPOUND))
+				circuitInventory.read(data.getCompoundTag("CircuitInventory"));
 		}
 
 		protected Widget<?> contentBuffer(PanelSyncManager syncManager, PacketBuffer buffer) {
