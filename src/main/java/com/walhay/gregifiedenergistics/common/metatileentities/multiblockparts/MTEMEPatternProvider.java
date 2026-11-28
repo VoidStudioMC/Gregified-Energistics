@@ -82,46 +82,42 @@ public class MTEMEPatternProvider extends MTEAbstractPatternProvider {
 		tooltip.add(I18n.format(getTooltipKey() + ".capacity", getPatternSlotCount()));
 	}
 
-	// TODO: Remove this override, LegacyInventory and PatternProviderMigrationTest after the next patch.
+	// TODO: Remove the legacy inventory migration after the next patch.
 	@Override
 	public void readFromNBT(NBTTagCompound data) {
-		super.readFromNBT(LegacyInventory.migrate(data));
+		super.readFromNBT(migrateLegacyInventory(data));
 	}
 
-	static final class LegacyInventory {
-		private LegacyInventory() {}
-
-		static NBTTagCompound migrate(NBTTagCompound data) {
-			NBTTagCompound patterns = data.getCompoundTag("PatternInventory");
-			if (patterns.hasKey("Containers", NBT.TAG_LIST) || !data.hasKey("ImportInventory", NBT.TAG_LIST))
-				return data;
-
-			NBTTagCompound items = new NBTTagCompound();
-			items.setTag(
-					"Items",
-					data.getTagList("ImportInventory", NBT.TAG_COMPOUND).copy());
-			NBTTagCompound contents = new NBTTagCompound();
-			contents.setTag("Items", items);
-			contents.setBoolean("PendingReconfiguration", true);
-			if (data.hasKey("GhostCircuit", NBT.TAG_ANY_NUMERIC)) {
-				NBTTagCompound circuit = new NBTTagCompound();
-				circuit.setInteger("GhostCircuit", data.getInteger("GhostCircuit"));
-				contents.setTag("CircuitInventory", circuit);
-				contents.setBoolean("PreserveCircuitOnReconfiguration", true);
-			}
-
-			NBTTagCompound container = new NBTTagCompound();
-			container.setInteger("Slot", 0);
-			container.setTag("Data", contents);
-			NBTTagList containers = new NBTTagList();
-			containers.appendTag(container);
-
-			NBTTagCompound migrated = data.copy();
-			NBTTagCompound migratedPatterns = migrated.getCompoundTag("PatternInventory");
-			migratedPatterns.setTag("Containers", containers);
-			migrated.setTag("PatternInventory", migratedPatterns);
-			migrated.removeTag("ImportInventory");
-			return migrated;
+	private static NBTTagCompound migrateLegacyInventory(NBTTagCompound data) {
+		if (!data.hasKey("ImportInventory", NBT.TAG_LIST)
+				|| data.getCompoundTag("PatternInventory").hasKey("Containers", NBT.TAG_LIST)) {
+			return data;
 		}
+
+		NBTTagCompound migrated = data.copy();
+		NBTTagCompound items = new NBTTagCompound();
+		items.setTag("Items", migrated.getTagList("ImportInventory", NBT.TAG_COMPOUND));
+		migrated.removeTag("ImportInventory");
+
+		NBTTagCompound contents = new NBTTagCompound();
+		contents.setTag("Items", items);
+		contents.setBoolean("PendingReconfiguration", true);
+		if (data.hasKey("GhostCircuit", NBT.TAG_ANY_NUMERIC)) {
+			NBTTagCompound circuit = new NBTTagCompound();
+			circuit.setInteger("GhostCircuit", data.getInteger("GhostCircuit"));
+			contents.setTag("CircuitInventory", circuit);
+			contents.setBoolean("PreserveCircuitOnReconfiguration", true);
+		}
+
+		NBTTagCompound firstSlot = new NBTTagCompound();
+		firstSlot.setInteger("Slot", 0);
+		firstSlot.setTag("Data", contents);
+		NBTTagList containers = new NBTTagList();
+		containers.appendTag(firstSlot);
+
+		NBTTagCompound patterns = migrated.getCompoundTag("PatternInventory");
+		patterns.setTag("Containers", containers);
+		migrated.setTag("PatternInventory", patterns);
+		return migrated;
 	}
 }
