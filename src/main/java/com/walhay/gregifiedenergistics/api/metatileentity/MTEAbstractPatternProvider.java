@@ -273,7 +273,7 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 								buffer.circuitInventory,
 								() -> buffer.pending,
 								buffer::resizeClientStorage)
-						.buildUI(sh, index);
+						.buildUI(sh, index, buffer::refundItems);
 			});
 
 			@Override

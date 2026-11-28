@@ -14,6 +14,7 @@ import com.cleanroommc.modularui.value.sync.IntSyncValue;
 import com.cleanroommc.modularui.value.sync.ItemSlotSH;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import com.cleanroommc.modularui.widget.Widget;
+import com.cleanroommc.modularui.widgets.ButtonWidget;
 import com.cleanroommc.modularui.widgets.DynamicSyncedWidget;
 import com.cleanroommc.modularui.widgets.ListWidget;
 import com.cleanroommc.modularui.widgets.layout.Flow;
@@ -191,7 +192,10 @@ public final class PatternBufferPanel {
 		};
 	}
 
-	public PopupPanel buildUI(PanelSyncManager syncManager, int index) {
+	public PopupPanel buildUI(PanelSyncManager syncManager, int index, Runnable refundItems) {
+		String refundItemsAction = "refund_items";
+		syncManager.registerSyncedAction(refundItemsAction, false, true, buffer -> refundItems.run());
+
 		DynamicSyncHandler contents = new DynamicSyncHandler().widgetProvider(this::buildContents);
 		syncManager.onServerTick(new Runnable() {
 			private BufferLayout lastSent;
@@ -206,9 +210,10 @@ public final class PatternBufferPanel {
 			}
 		});
 		int popupWidth = MIN_WIDTH;
-		int popupHeight = 174;
+		int popupHeight = 192;
 		int bodyWidth = popupWidth - 2 * PADDING;
-		int bodyHeight = popupHeight - 44;
+		int bodyTop = 28;
+		int bodyHeight = popupHeight - bodyTop - SLOT_SIZE - 2 * PADDING;
 		int headerWidth = popupWidth - 40; // reserve the popup close button area
 
 		return (PopupPanel) GTGuis.createPopupPanel("buffer#" + index, popupWidth, popupHeight)
@@ -224,9 +229,19 @@ public final class PatternBufferPanel {
 								.slot(circuitInventory, 0)
 								.background(GTGuiTextures.SLOT, GTGuiTextures.INT_CIRCUIT_OVERLAY)))
 				.child(new DynamicSyncedWidget<>()
-						.pos(PADDING, 28)
+						.pos(PADDING, bodyTop)
 						.size(bodyWidth, bodyHeight)
-						.syncHandler(contents));
+						.syncHandler(contents))
+				.child(new ButtonWidget<>()
+						.size(140, SLOT_SIZE)
+						.horizontalCenter()
+						.bottom(PADDING)
+						.overlay(IKey.lang("gregifiedenergistics.gui.buffer_refund_items"))
+						.onMousePressed(mouseButton -> {
+							if (mouseButton != 0) return false;
+							syncManager.callSyncedAction(refundItemsAction);
+							return true;
+						}));
 	}
 
 	@FunctionalInterface
