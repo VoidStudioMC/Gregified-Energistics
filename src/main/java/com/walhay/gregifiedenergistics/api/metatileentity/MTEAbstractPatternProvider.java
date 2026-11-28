@@ -42,7 +42,9 @@ import com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuiTextures;
 import com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis;
 import com.walhay.gregifiedenergistics.api.mui.PatternBufferPanel;
 import com.walhay.gregifiedenergistics.api.patterns.implementations.GhostCircuitPatternWrapper;
+import com.walhay.gregifiedenergistics.mixins.interfaces.IPatternBufferController;
 import gregtech.api.capability.GregtechDataCodes;
+import gregtech.api.capability.IMultipleTankHandler;
 import gregtech.api.capability.impl.GhostCircuitItemStackHandler;
 import gregtech.api.metatileentity.multiblock.AbilityInstances;
 import gregtech.api.metatileentity.multiblock.IMultiblockAbilityPart;
@@ -504,6 +506,12 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 
 		private void refreshDelegates() {
 			handler.setFluidDelegate(storage.fluids());
+			if (handler instanceof IMultipleTankHandler && getWorld() != null && !getWorld().isRemote) {
+				var controller = getController();
+				if (controller instanceof IPatternBufferController bufferController && controller.isStructureFormed()) {
+					bufferController.refreshPatternBufferFluids();
+				}
+			}
 			contentsChanged();
 		}
 
