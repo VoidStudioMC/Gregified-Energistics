@@ -40,6 +40,7 @@ import com.walhay.gregifiedenergistics.api.capability.PatternBufferStorage;
 import com.walhay.gregifiedenergistics.api.capability.SegmentItemHandlerList;
 import com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuiTextures;
 import com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis;
+import com.walhay.gregifiedenergistics.api.mui.PatternBufferPanel;
 import com.walhay.gregifiedenergistics.api.patterns.implementations.GhostCircuitPatternWrapper;
 import gregtech.api.capability.GregtechDataCodes;
 import gregtech.api.capability.impl.GhostCircuitItemStackHandler;

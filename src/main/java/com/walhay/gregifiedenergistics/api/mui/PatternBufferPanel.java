@@ -1,4 +1,4 @@
-package com.walhay.gregifiedenergistics.api.metatileentity;
+package com.walhay.gregifiedenergistics.api.mui;
 
 import static com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig.MAX_SLOTS;
 import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.MIN_WIDTH;
@@ -22,7 +22,6 @@ import com.cleanroommc.modularui.widgets.slot.FluidSlot;
 import com.cleanroommc.modularui.widgets.slot.ItemSlot;
 import com.github.bsideup.jabel.Desugar;
 import com.walhay.gregifiedenergistics.api.capability.PatternBufferStorage;
-import com.walhay.gregifiedenergistics.api.mui.DynamicItemSlot;
 import gregtech.api.capability.impl.GhostCircuitItemStackHandler;
 import gregtech.api.mui.GTGuiTextures;
 import gregtech.api.mui.GTGuis;
@@ -36,7 +35,7 @@ import net.minecraftforge.fluids.FluidTankInfo;
 import net.minecraftforge.fluids.IFluidTank;
 
 /** Builds the per-pattern popup and synchronizes its layout when the buffer changes size. */
-final class PatternBufferPanel {
+public final class PatternBufferPanel {
 	private static final int SLOT_COLUMNS = 4;
 
 	private final PatternBufferStorage storage;
@@ -44,7 +43,7 @@ final class PatternBufferPanel {
 	private final BooleanSupplier pending;
 	private final ClientResize resizeClientStorage;
 
-	PatternBufferPanel(
+	public PatternBufferPanel(
 			PatternBufferStorage storage,
 			GhostCircuitItemStackHandler circuitInventory,
 			BooleanSupplier pending,
@@ -192,7 +191,7 @@ final class PatternBufferPanel {
 		};
 	}
 
-	PopupPanel buildUI(PanelSyncManager syncManager, int index) {
+	public PopupPanel buildUI(PanelSyncManager syncManager, int index) {
 		DynamicSyncHandler contents = new DynamicSyncHandler().widgetProvider(this::buildContents);
 		syncManager.onServerTick(new Runnable() {
 			private BufferLayout lastSent;
@@ -231,7 +230,7 @@ final class PatternBufferPanel {
 	}
 
 	@FunctionalInterface
-	interface ClientResize {
+	public interface ClientResize {
 		void resize(int itemSlots, int fluidSlots);
 	}
 
