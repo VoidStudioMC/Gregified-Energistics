@@ -35,7 +35,7 @@ import com.github.bsideup.jabel.Desugar;
 import com.glodblock.github.common.item.fake.FakeFluids;
 import com.glodblock.github.common.item.fake.FakeItemRegister;
 import com.walhay.gregifiedenergistics.api.capability.AbstractPatternItemHandler;
-import com.walhay.gregifiedenergistics.api.capability.PatternBufferHandler;
+import com.walhay.gregifiedenergistics.api.capability.IPatternBufferHandler;
 import com.walhay.gregifiedenergistics.api.capability.PatternBufferStorage;
 import com.walhay.gregifiedenergistics.api.capability.SegmentItemHandlerList;
 import com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuiTextures;
@@ -95,7 +95,7 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 
 	protected abstract String getTooltipKey();
 
-	protected abstract PatternBufferHandler createPatternBufferHandler(
+	protected abstract IPatternBufferHandler createPatternBufferHandler(
 			PatternBufferStorage storage, GhostCircuitItemStackHandler circuitInventory);
 
 	protected boolean isPatternSupported(ICraftingPatternDetails pattern) {
@@ -478,7 +478,7 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 		private final int slot;
 		private final PatternBufferStorage storage;
 		private final GhostCircuitItemStackHandler circuitInventory;
-		private final PatternBufferHandler handler;
+		private final IPatternBufferHandler handler;
 		private boolean pending;
 		private boolean preserveCircuitOnReconfiguration;
 

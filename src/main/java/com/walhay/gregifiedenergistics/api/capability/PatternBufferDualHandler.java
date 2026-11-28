@@ -10,7 +10,7 @@ import net.minecraftforge.items.IItemHandlerModifiable;
 import org.jetbrains.annotations.NotNull;
 
 /** Exposes buffered items, the ghost circuit, and fluid tanks as multiblock recipe inputs. */
-public class PatternBufferDualHandler extends DualHandler implements PatternBufferHandler {
+public class PatternBufferDualHandler extends DualHandler implements IPatternBufferHandler {
 
 	private List<IMultipleTankHandler.ITankEntry> tanks = Collections.emptyList();
 

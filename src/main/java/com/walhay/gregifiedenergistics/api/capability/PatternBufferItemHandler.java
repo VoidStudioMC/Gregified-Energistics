@@ -6,7 +6,7 @@ import java.util.List;
 import net.minecraftforge.items.IItemHandler;
 
 /** Item-only recipe inventory with dynamic slots and controller notifications. */
-public final class PatternBufferItemHandler extends SegmentItemHandlerList implements PatternBufferHandler {
+public final class PatternBufferItemHandler extends SegmentItemHandlerList implements IPatternBufferHandler {
 	private final List<MetaTileEntity> notifiableEntities = new ArrayList<>();
 
 	public PatternBufferItemHandler(IItemHandler... handlers) {
