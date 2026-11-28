@@ -81,11 +81,12 @@ public final class AssemblyLineInputQueue {
 			var entry = iterator.next();
 			int slot = entry.getIntKey();
 			if (slot < 0 || slot >= destinations.size()) continue;
-			AssemblyLineFluidTransfer.Result result =
-					AssemblyLineFluidTransfer.deliverOwned(destinations.get(slot), entry.getValue());
-			if (result.remainder == null) iterator.remove();
-			else entry.setValue(result.remainder);
-			if (result.delivered > 0) contentsChanged.run();
+			FluidStack stack = entry.getValue();
+			FluidStack remainder = AssemblyLineFluidTransfer.deliverOwned(destinations.get(slot), stack);
+			if (remainder == null) iterator.remove();
+			else entry.setValue(remainder);
+			int remaining = remainder == null ? 0 : remainder.amount;
+			if (stack != null && stack.amount > remaining) contentsChanged.run();
 		}
 	}
 

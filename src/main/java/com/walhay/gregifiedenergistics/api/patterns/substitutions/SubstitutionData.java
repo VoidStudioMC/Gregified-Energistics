@@ -72,22 +72,8 @@ public class SubstitutionData implements ISubstitutionStorage {
 		}
 		List<ItemStack> previous = candidates.put(name, copies);
 		if (!sameCandidates(previous, copies)) revision++;
-		if (name.startsWith("input:") && !options.containsKey(name)) restoreLegacySelection(name, copies);
 		int option = getOption(name);
 		if (!copies.isEmpty()) setOption(name, option);
-	}
-
-	/** Migrates a selected item from the old ingredient keys when the match is unambiguous. */
-	private void restoreLegacySelection(String name, List<ItemStack> stacks) {
-		ItemStack choice = null;
-		for (Map.Entry<String, ItemStack> entry : selected.entrySet()) {
-			if (!entry.getKey().startsWith("items:")) continue;
-			ItemStack oldChoice = entry.getValue();
-			if (stacks.stream().noneMatch(stack -> sameItem(stack, oldChoice))) continue;
-			if (choice != null && !sameItem(choice, oldChoice)) return;
-			choice = oldChoice;
-		}
-		if (choice != null) selected.put(name, choice.copy());
 	}
 
 	boolean hasCandidate(String name, int option) {

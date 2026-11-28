@@ -108,9 +108,9 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 		if (getWorld().isRemote) return;
 
 		if (isWorkingEnabled() && isAttachedToMultiBlock() && getOffsetTimer() % 5 == 0) {
-			if (hasItemsToSend()) pushItemsOut();
+			if (inputQueue.hasItems()) pushItemsOut();
 
-			if (hasFluidsToSend()) pushFluidsOut();
+			if (inputQueue.hasFluids()) pushFluidsOut();
 		}
 	}
 
@@ -451,7 +451,7 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 	// check if hatch can be used for pushing pattern right now
 	@Override
 	public boolean isBusy() {
-		if (!isWorkingEnabled() || !isAttachedToMultiBlock() || hasItemsToSend() || hasFluidsToSend()) {
+		if (!isWorkingEnabled() || !isAttachedToMultiBlock() || inputQueue.hasItems() || inputQueue.hasFluids()) {
 			return true;
 		}
 
@@ -480,8 +480,8 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 				|| !isAttachedToMultiBlock()
 				|| getWorld() == null
 				|| getWorld().isRemote
-				|| hasItemsToSend()
-				|| hasFluidsToSend()
+				|| inputQueue.hasItems()
+				|| inputQueue.hasFluids()
 				|| getProxy() == null
 				|| !getProxy().isActive()) {
 			return false;
@@ -494,8 +494,8 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 				|| !acceptsFluids(inputs.fluids)) return false;
 
 		inputQueue.enqueue(inputs);
-		if (hasFluidsToSend()) pushFluidsOut();
-		if (hasItemsToSend()) pushItemsOut();
+		if (inputQueue.hasFluids()) pushFluidsOut();
+		if (inputQueue.hasItems()) pushItemsOut();
 		return true;
 	}
 
@@ -523,12 +523,12 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 	}
 
 	private void pushItemsOut() {
-		if (!hasItemsToSend() || !isAttachedToMultiBlock()) return;
+		if (!inputQueue.hasItems() || !isAttachedToMultiBlock()) return;
 		inputQueue.deliverItems(getItemDestinations());
 	}
 
 	private void pushFluidsOut() {
-		if (!hasFluidsToSend() || !isAttachedToMultiBlock()) return;
+		if (!inputQueue.hasFluids() || !isAttachedToMultiBlock()) return;
 		inputQueue.deliverFluids(getController().getAbilities(MultiblockAbility.IMPORT_FLUIDS));
 	}
 
@@ -544,14 +544,6 @@ public abstract class MTEAbstractAssemblyLineBus extends MetaTileEntityCraftingP
 	}
 
 	public abstract Collection<? extends ICraftingPatternDetails> getPatterns();
-
-	public boolean hasItemsToSend() {
-		return inputQueue.hasItems();
-	}
-
-	public boolean hasFluidsToSend() {
-		return inputQueue.hasFluids();
-	}
 
 	public void setBlockingMode(BlockingMode blockingMode) {
 		if (blockingMode == null || this.blockingMode == blockingMode) return;
