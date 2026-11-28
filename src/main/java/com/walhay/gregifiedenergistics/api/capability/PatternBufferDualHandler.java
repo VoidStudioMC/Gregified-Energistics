@@ -9,7 +9,7 @@ import java.util.List;
 import net.minecraftforge.items.IItemHandlerModifiable;
 import org.jetbrains.annotations.NotNull;
 
-/** DualHandlerPattern */
+/** Exposes buffered items, the ghost circuit, and fluid tanks as multiblock recipe inputs. */
 public class PatternBufferDualHandler extends DualHandler implements PatternBufferHandler {
 
 	private List<IMultipleTankHandler.ITankEntry> tanks = Collections.emptyList();

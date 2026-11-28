@@ -7,7 +7,7 @@ import net.minecraftforge.common.util.Constants.NBT;
 import net.minecraftforge.items.ItemHandlerHelper;
 import net.minecraftforge.items.ItemStackHandler;
 
-/** InfiniteStackHandler */
+/** Stores item counts up to {@link Integer#MAX_VALUE} and preserves the full count in NBT. */
 public class InfiniteItemStackHandler extends ItemStackHandler {
 	public static final String FULL_COUNT_TAG = "FullCount";
 

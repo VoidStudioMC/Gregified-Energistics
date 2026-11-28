@@ -1,7 +1,6 @@
 package com.walhay.gregifiedenergistics.api.capability;
 
 import com.github.bsideup.jabel.Desugar;
-import gregtech.api.capability.impl.ItemHandlerList;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -11,10 +10,8 @@ import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.IItemHandlerModifiable;
 
 /**
- * SegmentItemHandlerList
- *
- * <p>Main idea of that class is to provide mutability of handler list unlike immutable {@link ItemHandlerList} which
- * caches handlers on construction.
+ * Presents handlers as one inventory. Slot offsets are recalculated on access because a pattern change can resize a
+ * delegate while its multiblock is running.
  */
 public class SegmentItemHandlerList implements IItemHandlerModifiable {
 
@@ -98,6 +95,7 @@ public class SegmentItemHandlerList implements IItemHandlerModifiable {
 		}
 	}
 
+	/** The delegate and its first global slot index. */
 	@Desugar
 	public record HandlerEntry(IItemHandler handler, int index) {}
 }

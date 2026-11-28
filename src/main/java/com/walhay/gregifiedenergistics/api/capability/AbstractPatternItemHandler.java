@@ -16,6 +16,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants.NBT;
 
+/** Stores encoded patterns and caches the decoded recipe for each slot. */
 public abstract class AbstractPatternItemHandler extends GTItemStackHandler {
 
 	private final int configuredSize;
@@ -27,6 +28,7 @@ public abstract class AbstractPatternItemHandler extends GTItemStackHandler {
 		this.patterns = new ICraftingPatternDetails[size];
 	}
 
+	/** Keeps occupied slots from an older, larger configuration available for recovery. */
 	@Override
 	public void deserializeNBT(NBTTagCompound data) {
 		int requiredSize = configuredSize;

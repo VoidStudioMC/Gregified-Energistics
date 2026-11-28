@@ -1,10 +1,7 @@
 package com.walhay.gregifiedenergistics.api.metatileentity;
 
-import static com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig.MAX_SLOTS;
 import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.CONTENT_TOP;
 import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.INVENTORY_SPACE;
-import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.MIN_WIDTH;
-import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.PADDING;
 import static com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis.SLOT_SIZE;
 
 import appeng.api.AEApi;
@@ -29,28 +26,22 @@ import com.cleanroommc.modularui.factory.PosGuiData;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.RichTooltip;
 import com.cleanroommc.modularui.screen.UISettings;
-import com.cleanroommc.modularui.utils.Alignment;
-import com.cleanroommc.modularui.value.sync.*;
-import com.cleanroommc.modularui.widget.Widget;
-import com.cleanroommc.modularui.widgets.DynamicSyncedWidget;
+import com.cleanroommc.modularui.value.sync.PanelSyncManager;
+import com.cleanroommc.modularui.value.sync.SyncHandlers;
 import com.cleanroommc.modularui.widgets.ListWidget;
-import com.cleanroommc.modularui.widgets.layout.Flow;
 import com.cleanroommc.modularui.widgets.layout.Grid;
-import com.cleanroommc.modularui.widgets.slot.FluidSlot;
 import com.cleanroommc.modularui.widgets.slot.ItemSlot;
-import com.cleanroommc.modularui.widgets.slot.ModularSlot;
+import com.github.bsideup.jabel.Desugar;
 import com.glodblock.github.common.item.fake.FakeFluids;
 import com.glodblock.github.common.item.fake.FakeItemRegister;
 import com.walhay.gregifiedenergistics.api.capability.AbstractPatternItemHandler;
 import com.walhay.gregifiedenergistics.api.capability.PatternBufferHandler;
 import com.walhay.gregifiedenergistics.api.capability.PatternBufferStorage;
 import com.walhay.gregifiedenergistics.api.capability.SegmentItemHandlerList;
-import com.walhay.gregifiedenergistics.api.mui.DynamicItemSlot;
 import com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuiTextures;
 import com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuis;
 import com.walhay.gregifiedenergistics.api.patterns.implementations.GhostCircuitPatternWrapper;
 import gregtech.api.capability.GregtechDataCodes;
-import gregtech.api.capability.IMultipleTankHandler;
 import gregtech.api.capability.impl.GhostCircuitItemStackHandler;
 import gregtech.api.metatileentity.multiblock.AbilityInstances;
 import gregtech.api.metatileentity.multiblock.IMultiblockAbilityPart;
@@ -58,8 +49,6 @@ import gregtech.api.metatileentity.multiblock.MultiblockAbility;
 import gregtech.api.metatileentity.multiblock.MultiblockControllerBase;
 import gregtech.api.mui.GTGuiTextures;
 import gregtech.api.mui.GTGuis;
-import gregtech.api.mui.GTGuis.PopupPanel;
-import gregtech.api.mui.widget.GhostCircuitSlotWidget;
 import gregtech.client.renderer.texture.cube.SimpleOverlayRenderer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -80,8 +69,6 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.util.Constants.NBT;
 import net.minecraftforge.common.util.INBTSerializable;
 import net.minecraftforge.fluids.FluidStack;
-import net.minecraftforge.fluids.FluidTankInfo;
-import net.minecraftforge.fluids.IFluidTank;
 import net.minecraftforge.items.IItemHandlerModifiable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -276,10 +263,15 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 
 	private ItemSlot patternSlot(PanelSyncManager syncManager, int index, IKey inventoryHint) {
 		return new ItemSlot() {
-			private final IPanelHandler panel = syncManager.syncedPanel(
-					"buffer#" + index,
-					true,
-					(sh, ph) -> patternHandler.getContainers().get(index).buildUI(sh, index));
+			private final IPanelHandler panel = syncManager.syncedPanel("buffer#" + index, true, (sh, ph) -> {
+				var buffer = patternHandler.getContainers().get(index);
+				return new PatternBufferPanel(
+								buffer.storage,
+								buffer.circuitInventory,
+								() -> buffer.pending,
+								buffer::resizeClientStorage)
+						.buildUI(sh, index);
+			});
 
 			@Override
 			public @NotNull Result onKeyPressed(char typedChar, int keyCode) {
@@ -481,13 +473,7 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 		}
 	}
 
-	/**
-	 * PatternContainer
-	 *
-	 * <p>Medium for operations on {@link IItemHandlerModifiable} and {@link IMultipleTankHandler}.
-	 *
-	 * <p>Implements {@link INBTSerializable} for serializing container content.
-	 */
+	/** Owns the buffered inputs and recipe handlers for one pattern slot. */
 	private class PatternContainer implements INBTSerializable<NBTTagCompound> {
 		private final int slot;
 		private final PatternBufferStorage storage;
@@ -531,21 +517,23 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 			controller.getNotifiedFluidInputList().remove(handler);
 		}
 
-		private int[] shape(ICraftingPatternDetails pattern) {
-			int items = 0, fluids = 0;
-			if (pattern != null && pattern.getCondensedInputs() != null) {
-				for (IAEItemStack input : pattern.getCondensedInputs()) {
+		private BufferSize sizeFor(ICraftingPatternDetails pattern) {
+			int items = 0;
+			int fluids = 0;
+			IAEItemStack[] inputs = pattern == null ? null : pattern.getCondensedInputs();
+			if (inputs != null) {
+				for (IAEItemStack input : inputs) {
 					if (input == null) continue;
 					if (FakeFluids.isFluidFakeItem(input.asItemStackRepresentation())) ++fluids;
 					else ++items;
 				}
 			}
-			return new int[] {items, fluids};
+			return new BufferSize(items, fluids);
 		}
 
 		private boolean configure(ICraftingPatternDetails pattern) {
-			int[] shape = shape(pattern);
-			if (!storage.configure(shape[0], shape[1])) {
+			BufferSize size = sizeFor(pattern);
+			if (!storage.configure(size.itemSlots(), size.fluidSlots())) {
 				pending = true;
 				return false;
 			}
@@ -564,6 +552,14 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 			for (var tank : storage.fluids().getFluidTanks()) tank.drain(Integer.MAX_VALUE, true);
 		}
 
+		private void resizeClientStorage(int itemSlots, int fluidSlots) {
+			if (itemSlots == storage.items().getSlots()
+					&& fluidSlots == storage.fluids().getTanks()) return;
+			clearClientContents();
+			storage.configure(itemSlots, fluidSlots);
+			refreshDelegates();
+		}
+
 		private void requestPattern(ICraftingPatternDetails pattern) {
 			preserveCircuitOnReconfiguration = false;
 			if (getWorld() != null && getWorld().isRemote) {
@@ -576,6 +572,7 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 			contentsChanged();
 		}
 
+		/** A replacement pattern stays unavailable to AE2 until the previous inputs leave the buffer. */
 		private boolean retryReconfiguration() {
 			if (!pending) return false;
 			refundItems();
@@ -654,214 +651,17 @@ public abstract class MTEAbstractPatternProvider extends MetaTileEntityCraftingP
 			refreshDelegates();
 			preserveCircuitOnReconfiguration = data.getBoolean("PreserveCircuitOnReconfiguration");
 			ICraftingPatternDetails pattern = patternHandler.getPatternDetails(slot);
-			int[] shape = shape(pattern);
+			BufferSize size = sizeFor(pattern);
 			pending = data.getBoolean("PendingReconfiguration")
 					|| pattern == null && !storage.isEmpty()
-					|| storage.items().getSlots() != shape[0]
-					|| storage.fluids().getTanks() != shape[1];
+					|| storage.items().getSlots() != size.itemSlots()
+					|| storage.fluids().getTanks() != size.fluidSlots();
 			if (storage.isEmpty()) configure(pattern);
 			if (data.hasKey("CircuitInventory", NBT.TAG_COMPOUND))
 				circuitInventory.read(data.getCompoundTag("CircuitInventory"));
 		}
-
-		protected Widget<?> contentBuffer(PanelSyncManager syncManager, PacketBuffer buffer) {
-			int slots = buffer.readInt();
-			int fluids = buffer.readInt();
-			boolean waitingForRecovery = buffer.readBoolean();
-			if (slots < 0 || slots > MAX_SLOTS || fluids < 0 || fluids > MAX_SLOTS)
-				throw new IllegalArgumentException("Invalid buffer GUI shape");
-			if (syncManager.isClient()
-					&& (slots != storage.items().getSlots()
-							|| fluids != storage.fluids().getTanks())) {
-				clearClientContents();
-				storage.configure(slots, fluids);
-				refreshDelegates();
-			}
-
-			Flow row = Flow.row()
-					.childPadding(10)
-					.crossAxisAlignment(Alignment.CrossAxis.START)
-					.coverChildrenHeight()
-					.horizontalCenter();
-
-			if (slots > 0) {
-				row.child(Flow.column()
-						.coverChildren()
-						.child(IKey.lang("gregifiedenergistics.gui.buffer_items")
-								.asWidget()
-								.style(IKey.DARK_GRAY))
-						.child(new Grid()
-								.minColWidth(18)
-								.minRowHeight(18)
-								.coverChildrenHeight()
-								.mapTo(4, slots, slotIndex -> {
-									ModularSlot ms = new DynamicItemSlot(storage.items(), slotIndex);
-
-									ItemSlotSH itemSyncHandler = syncManager.getOrCreateSyncHandler(
-											"buffer_slot", slotIndex, ItemSlotSH.class, () -> new ItemSlotSH(ms));
-
-									IntSyncValue total = syncManager.getOrCreateSyncHandler(
-											"buffer_amount",
-											slotIndex,
-											IntSyncValue.class,
-											() -> itemCountSync(slotIndex));
-									return new ItemSlot() {
-										@Override
-										public void buildTooltip(
-												ItemStack stack, com.cleanroommc.modularui.screen.RichTooltip tooltip) {
-											super.buildTooltip(stack, tooltip);
-											tooltip.addLine(IKey.lang(
-													"gregifiedenergistics.gui.buffer_count", total.getIntValue()));
-										}
-									}.syncHandler(itemSyncHandler).background(GTGuiTextures.SLOT);
-								})));
-			}
-
-			if (fluids > 0) {
-				row.child(Flow.column()
-						.coverChildren()
-						.child(IKey.lang("gregifiedenergistics.gui.buffer_fluids")
-								.asWidget()
-								.style(IKey.DARK_GRAY))
-						.child(new Grid()
-								.minColWidth(18)
-								.minRowHeight(18)
-								.coverChildrenHeight()
-								.mapTo(4, fluids, fluidIndex -> {
-									FluidSlotSyncHandler fsh = syncManager.getOrCreateSyncHandler(
-											"fluid_slot",
-											fluidIndex,
-											FluidSlotSyncHandler.class,
-											() -> new FluidSlotSyncHandler(liveTank(fluidIndex)));
-
-									return new FluidSlot().syncHandler(fsh);
-								})));
-			}
-
-			if (slots == 0 && fluids == 0) {
-				row.child(IKey.lang("gregifiedenergistics.gui.buffer_empty").asWidget());
-			}
-
-			Widget<?> contents = row.coverChildren();
-			if (waitingForRecovery) {
-				contents = Flow.column()
-						.coverChildren()
-						.child(IKey.lang("gregifiedenergistics.gui.buffer_pending")
-								.asWidget()
-								.width(180))
-						.child(row.coverChildren());
-			}
-			return new com.cleanroommc.modularui.widgets.ListWidget<>()
-					.widthRel(1f)
-					.heightRel(1f)
-					.child(contents);
-		}
-
-		private IntSyncValue itemCountSync(int index) {
-			return new IntSyncValue(() -> index < storage.items().getSlots()
-					? storage.items().getStackInSlot(index).getCount()
-					: 0) {
-				private boolean initialSync = true;
-
-				@Override
-				public void init(String key, PanelSyncManager manager) {
-					super.init(key, manager);
-					initialSync = true;
-				}
-
-				@Override
-				public void detectAndSendChanges(boolean init) {
-					// Dynamic handlers are registered after the panel's first sync.
-					// Send the initial amount even when the constructor cache is current.
-					super.detectAndSendChanges(init || initialSync);
-					initialSync = false;
-				}
-			};
-		}
-
-		private IFluidTank liveTank(int index) {
-			return new IFluidTank() {
-				private IFluidTank current() {
-					return index < storage.fluids().getTanks()
-							? storage.fluids().getTankAt(index)
-							: null;
-				}
-
-				public FluidStack getFluid() {
-					IFluidTank tank = current();
-					FluidStack fluid = tank == null ? null : tank.getFluid();
-					return fluid == null ? null : fluid.copy();
-				}
-
-				public int getFluidAmount() {
-					IFluidTank tank = current();
-					return tank == null ? 0 : tank.getFluidAmount();
-				}
-
-				public int getCapacity() {
-					IFluidTank tank = current();
-					return tank == null ? 0 : tank.getCapacity();
-				}
-
-				public FluidTankInfo getInfo() {
-					return new FluidTankInfo(getFluid(), getCapacity());
-				}
-
-				public int fill(FluidStack resource, boolean doFill) {
-					IFluidTank tank = current();
-					return tank == null ? 0 : tank.fill(resource, doFill);
-				}
-
-				public FluidStack drain(int amount, boolean doDrain) {
-					IFluidTank tank = current();
-					return tank == null ? null : tank.drain(amount, doDrain);
-				}
-			};
-		}
-
-		public PopupPanel buildUI(PanelSyncManager syncManager, int index) {
-			DynamicSyncHandler dsh = new DynamicSyncHandler().widgetProvider(this::contentBuffer);
-			syncManager.onServerTick(new Runnable() {
-				private int sentItemSlots = -1;
-				private int sentFluidSlots = -1;
-				private boolean sentPending;
-
-				@Override
-				public void run() {
-					int itemSlots = storage.items().getSlots();
-					int fluidSlots = storage.fluids().getTanks();
-					boolean waitingForRecovery = pending;
-					if (sentItemSlots == itemSlots && sentFluidSlots == fluidSlots && sentPending == waitingForRecovery)
-						return;
-					sentItemSlots = itemSlots;
-					sentFluidSlots = fluidSlots;
-					sentPending = waitingForRecovery;
-					dsh.notifyUpdate(
-							buf -> buf.writeInt(itemSlots).writeInt(fluidSlots).writeBoolean(waitingForRecovery));
-				}
-			});
-			int popupWidth = MIN_WIDTH;
-			int popupHeight = 174;
-			int bodyWidth = popupWidth - 2 * PADDING;
-			int bodyHeight = popupHeight - 44;
-			int headerWidth = popupWidth - 40; // reserve the popup close button area
-
-			return (PopupPanel) GTGuis.createPopupPanel("buffer#" + index, popupWidth, popupHeight)
-					.child(Flow.row()
-							.pos(PADDING, 5)
-							.width(headerWidth)
-							.height(18)
-							.mainAxisAlignment(Alignment.MainAxis.SPACE_BETWEEN)
-							.crossAxisAlignment(Alignment.CrossAxis.CENTER)
-							.child(IKey.lang("gregifiedenergistics.gui.buffer_contents", index + 1)
-									.asWidget())
-							.child(new GhostCircuitSlotWidget()
-									.slot(circuitInventory, 0)
-									.background(GTGuiTextures.SLOT, GTGuiTextures.INT_CIRCUIT_OVERLAY)))
-					.child(new DynamicSyncedWidget<>()
-							.pos(PADDING, 28)
-							.size(bodyWidth, bodyHeight)
-							.syncHandler(dsh));
-		}
 	}
+
+	@Desugar
+	private record BufferSize(int itemSlots, int fluidSlots) {}
 }
