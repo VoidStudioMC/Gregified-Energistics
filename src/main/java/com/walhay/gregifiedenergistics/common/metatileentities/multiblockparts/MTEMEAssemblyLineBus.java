@@ -13,6 +13,7 @@ import com.cleanroommc.modularui.widgets.layout.Grid;
 import com.cleanroommc.modularui.widgets.slot.ItemSlot;
 import com.walhay.gregifiedenergistics.GregifiedEnergisticsConfig;
 import com.walhay.gregifiedenergistics.api.capability.AbstractPatternItemHandler;
+import com.walhay.gregifiedenergistics.api.metatileentity.MTEAbstractAssemblyLineBus;
 import com.walhay.gregifiedenergistics.api.mui.GregifiedEnergisticsGuiTextures;
 import com.walhay.gregifiedenergistics.api.patterns.implementations.DataStickPatternHelper;
 import gregtech.api.metatileentity.MetaTileEntity;

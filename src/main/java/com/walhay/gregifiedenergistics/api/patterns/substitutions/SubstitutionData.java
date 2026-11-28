@@ -72,22 +72,13 @@ public class SubstitutionData implements ISubstitutionStorage {
 		}
 		List<ItemStack> previous = candidates.put(name, copies);
 		if (!sameCandidates(previous, copies)) revision++;
-		if (name.startsWith("input:") && !options.containsKey(name)) {
-			// Older saves stored non-ore choices under hashes. Reuse an unambiguous selected item.
-			ItemStack oldChoice = null;
-			for (Map.Entry<String, ItemStack> entry : selected.entrySet()) {
-				if (!entry.getKey().startsWith("items:")
-						|| copies.stream().noneMatch(stack -> sameItem(stack, entry.getValue()))) continue;
-				if (oldChoice != null && !sameItem(oldChoice, entry.getValue())) {
-					oldChoice = null;
-					break;
-				}
-				oldChoice = entry.getValue();
-			}
-			if (oldChoice != null) selected.put(name, oldChoice.copy());
-		}
 		int option = getOption(name);
 		if (!copies.isEmpty()) setOption(name, option);
+	}
+
+	boolean hasCandidate(String name, int option) {
+		List<ItemStack> stacks = candidates.get(name);
+		return stacks != null && option >= 0 && option < stacks.size();
 	}
 
 	@Override
@@ -106,6 +97,7 @@ public class SubstitutionData implements ISubstitutionStorage {
 		return serialize(false);
 	}
 
+	/** Includes candidate lists so the client can display the available substitutions. */
 	public NBTTagCompound serializeSyncNBT() {
 		return serialize(true);
 	}

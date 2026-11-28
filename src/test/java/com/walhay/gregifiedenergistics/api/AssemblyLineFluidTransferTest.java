@@ -22,17 +22,14 @@ class AssemblyLineFluidTransferTest {
 	void emptySourceAndFullDestinationNeverLoseOrExtractFluid() {
 		FluidStack request = new FluidStack(FluidRegistry.WATER, 1000);
 		AtomicInteger extracted = new AtomicInteger();
-		AssemblyLineFluidTransfer.Result full =
-				AssemblyLineFluidTransfer.transfer(new FluidTank(0), request, null, stack -> {
-					extracted.addAndGet(stack.amount);
-					return stack;
-				});
-		assertEquals(0, full.delivered);
+		FluidStack full = AssemblyLineFluidTransfer.transfer(new FluidTank(0), request, null, stack -> {
+			extracted.addAndGet(stack.amount);
+			return stack;
+		});
+		assertNull(full);
 		assertEquals(0, extracted.get());
-		AssemblyLineFluidTransfer.Result empty =
-				AssemblyLineFluidTransfer.transfer(new FluidTank(1000), request, null, stack -> null);
-		assertEquals(0, empty.delivered);
-		assertNull(empty.remainder);
+		FluidStack empty = AssemblyLineFluidTransfer.transfer(new FluidTank(1000), request, null, stack -> null);
+		assertNull(empty);
 		assertEquals(1000, request.amount);
 	}
 
@@ -49,22 +46,21 @@ class AssemblyLineFluidTransferTest {
 				return super.fill(partial, true);
 			}
 		};
-		AssemblyLineFluidTransfer.Result first = AssemblyLineFluidTransfer.transfer(changing, request, null, stack -> {
+		FluidStack first = AssemblyLineFluidTransfer.transfer(changing, request, null, stack -> {
 			extracted.addAndGet(stack.amount);
 			return stack.copy();
 		});
-		assertEquals(300, first.delivered);
-		assertEquals(700, first.remainder.amount);
-		assertEquals(extracted.get(), changing.getFluidAmount() + first.remainder.amount);
-		request.amount -= first.delivered;
+		assertEquals(300, changing.getFluidAmount());
+		assertEquals(700, first.amount);
+		assertEquals(extracted.get(), changing.getFluidAmount() + first.amount);
+		request.amount -= changing.getFluidAmount();
 		FluidTank retryDestination = new FluidTank(1000);
-		AssemblyLineFluidTransfer.Result retry =
-				AssemblyLineFluidTransfer.transfer(retryDestination, request, first.remainder, stack -> {
-					extracted.addAndGet(stack.amount);
-					return stack;
-				});
-		assertEquals(700, retry.delivered);
-		assertNull(retry.remainder);
+		FluidStack retry = AssemblyLineFluidTransfer.transfer(retryDestination, request, first, stack -> {
+			extracted.addAndGet(stack.amount);
+			return stack;
+		});
+		assertEquals(700, retryDestination.getFluidAmount());
+		assertNull(retry);
 		assertEquals(1000, extracted.get());
 		assertEquals(extracted.get(), changing.getFluidAmount() + retryDestination.getFluidAmount());
 	}
@@ -73,14 +69,13 @@ class AssemblyLineFluidTransferTest {
 	void partialSourceAndLimitedCapacityOnlyConsumeDeliveredOrRetainedQuantity() {
 		FluidTank destination = new FluidTank(400);
 		AtomicInteger asked = new AtomicInteger();
-		AssemblyLineFluidTransfer.Result result = AssemblyLineFluidTransfer.transfer(
+		FluidStack remainder = AssemblyLineFluidTransfer.transfer(
 				destination, new FluidStack(FluidRegistry.WATER, 1000), null, stack -> {
 					asked.set(stack.amount);
 					return new FluidStack(FluidRegistry.WATER, 200);
 				});
 		assertEquals(400, asked.get());
-		assertEquals(200, result.delivered);
 		assertEquals(200, destination.getFluidAmount());
-		assertNull(result.remainder);
+		assertNull(remainder);
 	}
 }

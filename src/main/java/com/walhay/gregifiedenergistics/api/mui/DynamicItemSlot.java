@@ -7,7 +7,7 @@ import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.IItemHandlerModifiable;
 import net.minecraftforge.items.ItemHandlerHelper;
 
-/** ItemSlot */
+/** Presents a vanilla-sized slice of a buffered stack while retaining the full count on the server. */
 public class DynamicItemSlot extends ModularSlot {
 	private final int handlerIndex;
 

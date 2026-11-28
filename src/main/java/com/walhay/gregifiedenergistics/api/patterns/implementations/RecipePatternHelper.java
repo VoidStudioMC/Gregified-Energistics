@@ -12,12 +12,14 @@ import gregtech.api.recipes.ingredients.GTRecipeInput;
 import java.util.Arrays;
 import java.util.stream.Stream;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants.NBT;
 import net.minecraftforge.fluids.FluidStack;
 
+/** An AE2 processing pattern backed by a GregTech assembly line recipe and its chosen inputs. */
 public class RecipePatternHelper extends AbstractPatternHelper {
 
 	private final Recipe recipe;
@@ -67,10 +69,11 @@ public class RecipePatternHelper extends AbstractPatternHelper {
 		return copy;
 	}
 
+	/** @return the recipe identity and the concrete inputs reserved by the crafting CPU */
 	public NBTTagCompound writeToNBT() {
 		NBTTagCompound data = new NBTTagCompound();
 		data.setBoolean("FluidInputsInCrafting", true);
-		data.setTag("Recipe", recipeData(recipe));
+		data.setTag("Recipe", recipeIdentity(recipe));
 		NBTTagList items = new NBTTagList();
 		for (int i = 0; i < inputs.length; ++i) {
 			NBTTagCompound tag = InfiniteItemStackHandler.writeStack(inputs[i].createItemStack());
@@ -88,36 +91,30 @@ public class RecipePatternHelper extends AbstractPatternHelper {
 		return data;
 	}
 
-	public static RecipePatternHelper readFromNBT(NBTTagCompound data, ItemStack pattern) {
+	/**
+	 * Restores a plan when exactly one current recipe matches its settings and chosen inputs.
+	 *
+	 * @param data saved recipe plan from the crafting CPU
+	 * @param pattern item that supplied the recipe, or {@link ItemStack#EMPTY} for an optical source
+	 * @return the restored pattern, or {@code null} if the job must be replanned
+	 */
+	@Nullable public static RecipePatternHelper readFromNBT(NBTTagCompound data, ItemStack pattern) {
 		NBTTagList items = data.getTagList("Inputs", NBT.TAG_COMPOUND);
 		NBTTagList fluids = data.getTagList("FluidInputs", NBT.TAG_COMPOUND);
-		// Older jobs never reserved their fluid inputs in the CPU. Replanning must include them.
+		// A fluid-aware plan must confirm that the CPU reserved its fluid inputs.
 		if (!fluids.isEmpty() && !data.getBoolean("FluidInputsInCrafting")) return null;
 		ItemStack[] savedItems = new ItemStack[items.tagCount()];
 		Arrays.setAll(savedItems, i -> InfiniteItemStackHandler.readStack(items.getCompoundTagAt(i)));
 		FluidStack[] savedFluids = new FluidStack[fluids.tagCount()];
 		Arrays.setAll(savedFluids, i -> FluidStack.loadFluidStackFromNBT(fluids.getCompoundTagAt(i)));
+		NBTTagCompound savedRecipe = data.getCompoundTag("Recipe");
 		RecipePatternHelper restored = null;
 		for (Recipe recipe : RecipeMaps.ASSEMBLY_LINE_RECIPES.getRecipeList()) {
 			if (recipe.getInputs().size() != savedItems.length
 					|| recipe.getFluidInputs().size() != savedFluids.length
-					|| !recipeData(recipe).equals(data.getCompoundTag("Recipe"))) continue;
-			boolean matches = true;
-			for (int i = 0; i < savedItems.length; ++i) {
-				GTRecipeInput input = recipe.getInputs().get(i);
-				matches &= !savedItems[i].isEmpty()
-						&& savedItems[i].getCount() == input.getAmount()
-						&& items.getCompoundTagAt(i).getBoolean("NonConsumable") == input.isNonConsumable()
-						&& input.acceptsStack(savedItems[i]);
-			}
-			for (int i = 0; i < savedFluids.length; ++i) {
-				GTRecipeInput input = recipe.getFluidInputs().get(i);
-				matches &= savedFluids[i] != null
-						&& savedFluids[i].amount == input.getAmount()
-						&& fluids.getCompoundTagAt(i).getBoolean("NonConsumable") == input.isNonConsumable()
-						&& input.acceptsFluid(savedFluids[i]);
-			}
-			if (!matches) continue;
+					|| !recipeIdentity(recipe).equals(savedRecipe)
+					|| !matchesItemInputs(recipe, items, savedItems)
+					|| !matchesFluidInputs(recipe, fluids, savedFluids)) continue;
 			RecipePatternHelper helper = new RecipePatternHelper(recipe, pattern);
 			if (!helper.isValidPattern()) continue;
 			// Never choose arbitrarily between recipes that accept the same saved plan.
@@ -129,7 +126,31 @@ public class RecipePatternHelper extends AbstractPatternHelper {
 		return restored;
 	}
 
-	private static NBTTagCompound recipeData(Recipe recipe) {
+	private static boolean matchesItemInputs(Recipe recipe, NBTTagList entries, ItemStack[] savedItems) {
+		for (int i = 0; i < savedItems.length; ++i) {
+			GTRecipeInput input = recipe.getInputs().get(i);
+			ItemStack stack = savedItems[i];
+			if (stack.isEmpty()
+					|| stack.getCount() != input.getAmount()
+					|| entries.getCompoundTagAt(i).getBoolean("NonConsumable") != input.isNonConsumable()
+					|| !input.acceptsStack(stack)) return false;
+		}
+		return true;
+	}
+
+	private static boolean matchesFluidInputs(Recipe recipe, NBTTagList entries, FluidStack[] savedFluids) {
+		for (int i = 0; i < savedFluids.length; ++i) {
+			GTRecipeInput input = recipe.getFluidInputs().get(i);
+			FluidStack stack = savedFluids[i];
+			if (stack == null
+					|| stack.amount != input.getAmount()
+					|| entries.getCompoundTagAt(i).getBoolean("NonConsumable") != input.isNonConsumable()
+					|| !input.acceptsFluid(stack)) return false;
+		}
+		return true;
+	}
+
+	private static NBTTagCompound recipeIdentity(Recipe recipe) {
 		NBTTagCompound data = new NBTTagCompound();
 		NBTTagList outputs = new NBTTagList();
 		for (ItemStack output : recipe.getOutputs()) outputs.appendTag(InfiniteItemStackHandler.writeStack(output));

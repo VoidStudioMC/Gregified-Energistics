@@ -13,7 +13,7 @@ import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidTank;
 import net.minecraftforge.items.ItemHandlerHelper;
 
-/** Owned buffer contents. Shape changes require an empty buffer; batch insertion commits only after full preflight. */
+/** Owns the input stacks and tanks for one pattern slot. */
 public final class PatternBufferStorage {
 
 	private final Runnable contentsChanged;
@@ -52,6 +52,13 @@ public final class PatternBufferStorage {
 		return true;
 	}
 
+	/**
+	 * Changes the storage dimensions if all existing inputs have been recovered.
+	 *
+	 * @param itemSlots number of item slots in the new recipe
+	 * @param fluidSlots number of tanks in the new recipe
+	 * @return whether the buffer was empty and could be resized
+	 */
 	public boolean configure(int itemSlots, int fluidSlots) {
 		checkSize(itemSlots);
 		checkSize(fluidSlots);
@@ -79,6 +86,13 @@ public final class PatternBufferStorage {
 		if (slots < 0 || slots > MAX_SLOTS) throw new IllegalArgumentException("Invalid buffer slot count: " + slots);
 	}
 
+	/**
+	 * Accepts a crafting batch only when every item and fluid fits in its respective inventory.
+	 *
+	 * @param incomingItems item stacks supplied by the crafting CPU
+	 * @param incomingFluids fluids supplied by the crafting CPU
+	 * @return whether the whole batch was accepted
+	 */
 	public boolean insertAll(List<ItemStack> incomingItems, List<FluidStack> incomingFluids) {
 		InfiniteItemStackHandler stagedItems = new InfiniteItemStackHandler(items.getSlots());
 		for (int i = 0; i < items.getSlots(); ++i)

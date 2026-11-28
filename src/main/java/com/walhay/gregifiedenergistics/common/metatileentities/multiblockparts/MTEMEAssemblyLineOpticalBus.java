@@ -11,6 +11,7 @@ import codechicken.lib.vec.Matrix4;
 import com.walhay.gregifiedenergistics.api.capability.GregifiedEnergisticsCapabilities;
 import com.walhay.gregifiedenergistics.api.capability.INetRecipeHandler;
 import com.walhay.gregifiedenergistics.api.capability.IOpticalNetRecipeHandler;
+import com.walhay.gregifiedenergistics.api.metatileentity.MTEAbstractAssemblyLineBus;
 import com.walhay.gregifiedenergistics.api.patterns.implementations.RecipePatternHelper;
 import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.api.metatileentity.interfaces.IGregTechTileEntity;
@@ -37,6 +38,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.capabilities.Capability;
 import org.jetbrains.annotations.NotNull;
 
+/** Publishes assembly line recipes received from the neighbouring optical pipe. */
 public class MTEMEAssemblyLineOpticalBus extends MTEAbstractAssemblyLineBus implements IOpticalNetRecipeHandler {
 
 	private static final String OPTICAL_FACING_TAG = "OpticalFacing";
@@ -170,43 +172,43 @@ public class MTEMEAssemblyLineOpticalBus extends MTEAbstractAssemblyLineBus impl
 				return;
 			}
 
-			TileEntity te = getWorld().getTileEntity(getPos().offset(opticalFacing));
-			if (te instanceof TileEntityOpticalPipe) {
-				INetRecipeHandler data = te.getCapability(
-						GregifiedEnergisticsCapabilities.CAPABILITY_RECIPE_HANDLER, opticalFacing.getOpposite());
-
-				if (data == null) {
-					clearPatternData();
-					return;
-				}
-
-				Set<INetRecipeHandler> seen = INetRecipeHandler.newTraversal();
-				Collection<Recipe> recipes = data.getRecipes(seen);
-				if (recipes == null) recipes = Collections.emptyList();
-
-				// Recipe.equals only compares inputs; registered recipes are immutable.
-				Set<Recipe> available = Collections.newSetFromMap(new IdentityHashMap<>());
-				available.addAll(recipes);
-				if (available.size() == patterns.size()
-						&& patterns.stream().allMatch(pattern -> available.contains(pattern.getRecipe()))) return;
-
-				patterns.clear();
-				for (Recipe recipe : recipes) {
-					if (!available.remove(recipe)) continue;
-					RecipePatternHelper pattern = new RecipePatternHelper(recipe);
-					pattern.injectSubstitutions(substitutionStorage);
-					patterns.add(pattern);
-				}
-
-				notifyPatternChange();
-				seen.forEach(INetRecipeHandler::onRecipesTransferred);
+			INetRecipeHandler source = findRecipeSource();
+			if (source == null) {
+				clearPatternData();
 				return;
 			}
 
-			clearPatternData();
+			Set<INetRecipeHandler> seen = INetRecipeHandler.newTraversal();
+			Collection<Recipe> recipes = source.getRecipes(seen);
+			if (recipes == null) recipes = Collections.emptyList();
+
+			// Recipe.equals only compares inputs, so a replacement recipe needs identity matching.
+			Set<Recipe> available = Collections.newSetFromMap(new IdentityHashMap<>());
+			available.addAll(recipes);
+			if (available.size() == patterns.size()
+					&& patterns.stream().allMatch(pattern -> available.contains(pattern.getRecipe()))) return;
+
+			patterns.clear();
+			for (Recipe recipe : recipes) {
+				if (!available.remove(recipe)) continue;
+				RecipePatternHelper pattern = new RecipePatternHelper(recipe);
+				pattern.injectSubstitutions(substitutionStorage);
+				patterns.add(pattern);
+			}
+
+			notifyPatternChange();
+			seen.forEach(INetRecipeHandler::onRecipesTransferred);
 		} finally {
 			updatingPatternData = false;
 		}
+	}
+
+	private INetRecipeHandler findRecipeSource() {
+		TileEntity neighbour = getWorld().getTileEntity(getPos().offset(opticalFacing));
+		return neighbour instanceof TileEntityOpticalPipe pipe
+				? pipe.getCapability(
+						GregifiedEnergisticsCapabilities.CAPABILITY_RECIPE_HANDLER, opticalFacing.getOpposite())
+				: null;
 	}
 
 	private void clearPatternData() {
@@ -229,7 +231,7 @@ public class MTEMEAssemblyLineOpticalBus extends MTEAbstractAssemblyLineBus impl
 
 	@Override
 	public Collection<Recipe> getRecipes(Set<INetRecipeHandler> seen) {
-		if (!seen.add(this)) return null;
+		seen.add(this);
 		return null;
 	}
 

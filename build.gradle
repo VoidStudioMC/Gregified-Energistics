@@ -329,7 +329,11 @@ tasks.register('cleanroomAfterSync') {
 
 if (propertyBool('use_modern_java_syntax')) {
     tasks.withType(Javadoc).configureEach {
-		options.source = '17'
+        // The Java 16 compiler uses Jabel, while Javadoc needs native Java 17 syntax support.
+        javadocTool.set(javaToolchains.javadocToolFor {
+            languageVersion.set(JavaLanguageVersion.of(JavaVersion.current().majorVersion))
+        })
+        options.source = '17'
     }
 }
 
