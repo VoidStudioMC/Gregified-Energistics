@@ -9,6 +9,9 @@ import appeng.me.cache.CraftingGridCache;
 import appeng.me.cluster.implementations.CraftingCPUCluster;
 import appeng.tile.crafting.TileCraftingTile;
 import appeng.util.item.AEItemStack;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
 import com.walhay.gregifiedenergistics.GregifiedEnergisticsMod;
 import com.walhay.gregifiedenergistics.api.patterns.implementations.GhostCircuitPatternWrapper;
 import com.walhay.gregifiedenergistics.api.patterns.implementations.RecipePatternHelper;
@@ -27,6 +30,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
+import org.spongepowered.asm.mixin.injection.Slice;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /** Snapshots custom ME patterns and restores them with their original inputs when a CPU reloads. */
@@ -71,19 +75,41 @@ public abstract class CraftingCPUClusterMixin {
 		return pattern instanceof RecipePatternHelper helper ? helper.copy() : pattern;
 	}
 
-	@Inject(method = "writeToNBT", at = @At("TAIL"), remap = false)
-	private void gregified$writeTasks(NBTTagCompound data, CallbackInfo ci) {
-		NBTTagList saved = data.getTagList(TASKS_TAG, NBT.TAG_COMPOUND);
-		int index = 0;
-		// AE2 already writes each pattern item and its progress in task-map order.
-		for (ICraftingPatternDetails pattern : tasks.keySet()) {
-			NBTTagCompound task = saved.getCompoundTagAt(index++);
-			if (pattern instanceof RecipePatternHelper recipe) {
-				task.setTag(RECIPE_TAG, recipe.writeToNBT());
-			} else if (pattern instanceof GhostCircuitPatternWrapper circuit) {
-				task.setInteger(GHOST_CIRCUIT_TAG, circuit.getCircuitValue());
-			}
+	@WrapOperation(
+			method = "writeToNBT",
+			at =
+					@At(
+							value = "INVOKE",
+							target =
+									"Lappeng/me/cluster/implementations/CraftingCPUCluster;writeItem(Lappeng/api/storage/data/IAEItemStack;)Lnet/minecraft/nbt/NBTTagCompound;"),
+			slice =
+					@Slice(
+							from =
+									@At(
+											value = "INVOKE",
+											target =
+													"Lappeng/api/networking/crafting/ICraftingPatternDetails;getPattern()Lnet/minecraft/item/ItemStack;")),
+			remap = false,
+			require = 1,
+			allow = 1)
+	private NBTTagCompound gregified$writeTask(
+			CraftingCPUCluster cluster,
+			IAEItemStack item,
+			Operation<NBTTagCompound> original,
+			@Local Map.Entry<ICraftingPatternDetails, ?> entry) {
+		NBTTagCompound task = original.call(cluster, item);
+		if (entry.getKey() instanceof RecipePatternHelper recipe) {
+			task.setTag(RECIPE_TAG, recipe.writeToNBT());
+		} else if (entry.getKey() instanceof GhostCircuitPatternWrapper circuit) {
+			task.setInteger(GHOST_CIRCUIT_TAG, circuit.getCircuitValue());
 		}
+		return task;
+	}
+
+	@Inject(method = "writeToNBT", at = @At("TAIL"), remap = false)
+	private void gregified$writeUnresolvedTasks(NBTTagCompound data, CallbackInfo ci) {
+		if (gregified$unresolvedTasks.isEmpty()) return;
+		NBTTagList saved = data.getTagList(TASKS_TAG, NBT.TAG_COMPOUND);
 		for (int i = 0; i < gregified$unresolvedTasks.tagCount(); ++i) {
 			saved.appendTag(gregified$unresolvedTasks.getCompoundTagAt(i).copy());
 		}
